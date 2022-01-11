@@ -1,0 +1,12 @@
+[Unit]
+Description=VNC Server for X11
+
+[Service]
+Type=forking
+ExecStart=/home/chrome/start.sh
+Restart=on-failure
+RestartSec=10
+User=chrome
+
+[Install]
+WantedBy=default.target

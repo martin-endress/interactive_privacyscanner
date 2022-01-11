@@ -1,0 +1,15 @@
+[Unit]
+Description=Browser
+Requires=privacyscanner_vnc.service
+After=privacyscanner_vnc.service
+
+[Service]
+Environment=DISPLAY=:1.0
+ExecStart=chromium-browser --disable-background-networking --disable-sync --metrics-recording-only --disable-default-apps --mute-audio --no-first-run --disable-background-timer-throttling --disable-client-side-phishing-detection --disable-popup-blocking --disable-prompt-on-repost --enable-automation --password-store=basic --use-mock-keychain --disable-component-update --autoplay-policy=no-user-gesture-required --disable-notifications --disable-hang-monitor --remote-debugging-port=9222
+Restart=always
+RestartSec=10
+WorkingDirectory=/opt/privacyscanner/browser
+User=chrome
+
+[Install]
+WantedBy=default.target
