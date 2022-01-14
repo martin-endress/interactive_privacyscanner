@@ -1,0 +1,3 @@
+from podman_container import build_container_image
+
+build_container_image()
