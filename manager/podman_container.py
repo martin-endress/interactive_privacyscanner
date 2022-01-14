@@ -3,14 +3,13 @@ import os
 from podman import PodmanClient
 from podman.errors import PodmanError, BuildError, NotFound, APIError
 
-
 CHROME_IMAGE_TAG = "chrome_scan"
 PODMAN_SOCKET_URI = "unix:///run/user/1000/podman/podman.sock"
 VNC_PORT = 5900
-DEVTOOLS_PORT = 9222
+DEVTOOLS_PORT = 9000
 
-# libpod rootless service unix domain socket (see
-# https://docs.podman.io/en/latest/markdown/podman-system-service.1.html)
+# libpod rootless service unix domain socket
+# (see https://docs.podman.io/en/latest/markdown/podman-system-service.1.html)
 podman_client = PodmanClient(base_url=PODMAN_SOCKET_URI, version="2.0")
 
 
@@ -21,6 +20,7 @@ class Container:
         self.labels = labels
         self.vnc_port = vnc_port
         self.devtools_port = devtools_port
+
 
 def stop_container(container_id):
     try:

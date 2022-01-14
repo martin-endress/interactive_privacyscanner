@@ -1,0 +1,14 @@
+[Unit]
+Description=Reverse Proxy
+Requires=privacyscanner_browser.service
+After=privacyscanner_browser.service
+
+[Service]
+ExecStart=socat tcp-l:9000,fork,reuseaddr tcp:localhost:9222
+Restart=always
+RestartSec=10
+WorkingDirectory=/opt/privacyscanner/browser
+User=chrome
+
+[Install]
+WantedBy=default.target
