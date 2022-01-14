@@ -1,0 +1,22 @@
+{
+  "profile": {
+    "content_settings": {
+      "exceptions": {
+        "plugins": {
+          "http://*,*": {
+            "setting": 1
+          },
+          "https://*,*": {
+            "setting": 1
+          }
+        }
+      }
+    }
+  },
+  "session": {
+    "restore_on_startup": 4,
+    "startup_urls": [
+      "about:blank"
+    ]
+  }
+}

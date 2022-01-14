@@ -1,18 +1,18 @@
 import asyncio
 import json
 import random
-import janus
-
-from threading import Thread
 from datetime import datetime
-from result import Result
 from pathlib import Path
+from threading import Thread
 from urllib.parse import urlparse
 
-from scanner_messages import ScannerMessage, MessageType
-from utils import slugify, DirectoryFileHandler, event_wait
+import janus
+
 from browser import ChromeBrowser
 from chromedev.extractors import CookiesExtractor
+from result import Result
+from scanner_messages import ScannerMessage, MessageType
+from utils import slugify, DirectoryFileHandler, event_wait
 
 EXTRACTOR_CLASSES = [CookiesExtractor]
 
@@ -39,25 +39,29 @@ class UserInteraction:
 
 class InteractiveScanner(Thread):
     # , url, logger, options, debugging_port=9222):
-    def __init__(self, url, debugging_port):
+    def __init__(self, url, debugging_port, options):
         super().__init__()
+        # Mark this thread as daemon
         self.daemon = True
+
+        # Init Message Queue
         self.event_loop = asyncio.new_event_loop()
         init_queue_task = self.event_loop.create_task(self._init_queue())
         self.event_loop.run_until_complete(init_queue_task)
+
         self.url = url
         # self.logger = logger
-        # self.options = options
+        self.options = options
         self.debugging_port = debugging_port
-        # self.init_result(options)
-        # self._extractor_classes = EXTRACTOR_CLASSES
-        # self._extractors = []
-        # self._loop = asyncio.get_event_loop()
-        # self._page_loaded = asyncio.Event()
-        # self._request_will_be_sent = asyncio.Event()
-        # self._response_log = []
-        # self._user_interaction = asyncio.Event()
-        # self.user_interaction_breakpoints = ["focus", "click", "mouseWheel"]
+
+        self.init_result(options)
+        self._extractor_classes = EXTRACTOR_CLASSES
+        self._extractors = []
+        self._page_loaded = asyncio.Event()
+        self._request_will_be_sent = asyncio.Event()
+        self._response_log = []
+        self._user_interaction = asyncio.Event()
+        self.user_interaction_breakpoints = ["focus", "click", "mouseWheel"]
 
     async def _init_queue(self):
         self._queue = janus.Queue()
@@ -72,67 +76,6 @@ class InteractiveScanner(Thread):
         if self._queue is None:
             raise ScannerInitError('Queue not correctly initialized.')
         self._queue.sync_q.put(msg)
-
-    async def _start_scanner(self):
-        while True:
-            message = await self._queue.async_q.get()
-            match message:
-                case ScannerMessage(message_type=MessageType.StartScan):
-                    print("starting scan of site%s" % message.content)
-                    await asyncio.sleep(2)
-                case ScannerMessage(message_type=MessageType.StopScan):
-                    print('stopping scan')
-                    break
-                case unknown_command:
-                    print(f"Unknown command '{unknown_command}' ignored.")
-        return
-        async with ChromeBrowser(debugging_port=self.debugging_port) as browser:
-            await browser.Target.setAutoAttach(
-                autoAttach=True, waitForDebuggerOnStart=False, flatten=True
-            )
-
-            self.target = await browser.new_target()
-
-            # Register domain notifications and callbacks
-            await self.register_callbacks()
-
-            # Navigate to url
-            await self.target.Input.setIgnoreInputEvents(ignore=True)
-            await self.target.Page.navigate(url=self.url)
-
-            await self.target.BackgroundService.startObserving(service="backgroundFetch")
-
-            loaded = await self._await_page_load()
-            await self.scroll_down_up()
-            await self._await_page_load()
-
-            # Activate Debugger breakpoints
-            for event_name in self.user_interaction_breakpoints:
-                await self.target.DOMDebugger.setEventListenerBreakpoint(eventName=event_name)
-
-            while True:
-                if loaded:
-                    print("Page loaded, extracting info..")
-                    target_info = await self.target.Target.getTargetInfo()
-                    url = target_info["targetInfo"]["url"]
-                    url_parsed = urlparse(url)
-                    if not self.start_url_netloc == url_parsed.netloc:
-                        print("Site exited, ending scan..")
-                        break
-                    await self._extract_information(url, self._user_interaction_reason)
-                else:
-                    print("no further content was loaded, contining")
-                print('waiting for next input...')
-                self._request_will_be_sent.clear()
-                self._user_interaction.clear()
-                await self.target.Input.setIgnoreInputEvents(ignore=False)
-                self._response_log.clear()
-                if not await event_wait(self._user_interaction, 10):
-                    print("no further input, exiting")
-                    break
-                await self.target.Input.setIgnoreInputEvents(ignore=True)
-                loaded = await self._await_page_load()
-            await self.target.close()
 
     def init_result(self, options):
         site_parsed = urlparse(self.url)
@@ -166,6 +109,85 @@ class InteractiveScanner(Thread):
                 "Could not write result JSON: {}".format(e)) from e
 
         self.result = Result(result_json, DirectoryFileHandler(results_dir))
+
+    async def _start_scanner(self):
+        async with ChromeBrowser(debugging_port=self.debugging_port) as b:
+            self.browser = b
+            while True:
+                print('waiting for message')
+                message = await self._queue.async_q.get()
+                try:
+                    r = await self._process_message(message)
+                    if r:
+                        return
+                except ScannerError as e:
+                    print(e)
+                    print('continuing...')
+
+    async def _process_message(self, message):
+        print('processing message', str(message))
+        match message:
+            case ScannerMessage(message_type=MessageType.StartScan):
+                print('navigating to page')
+                await self.navigate_to_page()
+            case ScannerMessage(message_type=MessageType.StopScan):
+                print('stopping scan')
+                return True
+            case unknown_command:
+                print(f"Unknown command '{unknown_command}' ignored.")
+        return False
+
+    async def navigate_to_page(self):
+        await self.browser.Target.setAutoAttach(
+            autoAttach=True, waitForDebuggerOnStart=False, flatten=True
+        )
+        print('new target')
+        self.target = await self.browser.new_target()
+
+        # Register domain notifications and callbacks
+        await self.register_callbacks()
+
+        # Navigate to url
+        await self.target.Input.setIgnoreInputEvents(ignore=True)
+        print('nav to page')
+        await self.target.Page.navigate(url=self.url)
+
+        await self.target.BackgroundService.startObserving(service="backgroundFetch")
+
+        loaded = await self._await_page_load()
+        return
+        await self.scroll_down_up()
+        await self._await_page_load()
+
+        # Activate Debugger breakpoints
+        for event_name in self.user_interaction_breakpoints:
+            await self.target.DOMDebugger.setEventListenerBreakpoint(eventName=event_name)
+
+        return
+
+        while True:
+            if loaded:
+                print("Page loaded, extracting info..")
+                target_info = await self.target.Target.getTargetInfo()
+                url = target_info["targetInfo"]["url"]
+                url_parsed = urlparse(url)
+                if not self.start_url_netloc == url_parsed.netloc:
+                    print("Site exited, ending scan..")
+                    break
+                await self._extract_information(url, self._user_interaction_reason)
+            else:
+                print("no further content was loaded, contining")
+            print('waiting for next input...')
+            self._request_will_be_sent.clear()
+            self._user_interaction.clear()
+            await self.target.Input.setIgnoreInputEvents(ignore=False)
+            self._response_log.clear()
+            if not await event_wait(self._user_interaction, 10):
+                print("no further input, exiting")
+                break
+            await self.target.Input.setIgnoreInputEvents(ignore=True)
+            loaded = await self._await_page_load()
+        await self.target.close()
 
     async def _set_page_loaded(self, **kwargs):
         self._page_loaded.set()

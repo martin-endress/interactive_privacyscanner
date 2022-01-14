@@ -15,8 +15,12 @@ COPY extra/privacyscanner_browser.service /etc/systemd/system/privacyscanner_bro
 COPY extra/privacyscanner_vnc.service /etc/systemd/system/privacyscanner_vnc.service
 COPY extra/start.sh /home/chrome/start.sh
 
+# Config chrome
+RUN mkdir -p "/home/chrome/chrome-profile/Default"
+COPY extra/Preferences /home/chrome/chrome-profile/Default/Preferences
+
 # Config VNC
-RUN mkdir /home/chrome/.vnc
+RUN mkdir "/home/chrome/.vnc"
 RUN x11vnc -storepasswd "asdf" /home/chrome/.vnc/passwd
 
 # Config VNC and logging

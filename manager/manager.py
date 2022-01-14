@@ -1,10 +1,9 @@
 import json
 
-import time
 from flask import Flask, Response, request
 
-from podman_container import Container, run_container, build_container_image, podman_available, stop_container
 from interactive_scanner import InteractiveScanner
+from podman_container import run_container, podman_available, stop_container
 from scanner_messages import ScannerMessage, MessageType
 
 # Init flask app
@@ -25,23 +24,34 @@ def before_request():
 
 @app.route('/start_instance', methods=['POST'])
 def start_instance():
-    start = time.time()
+    '''
+    Starts a scanning instance which includes the container and a manager subprocess.
+    The subprocess can be accessed using a message queue.
+    '''
     url = request.json['url']
 
     # Start container
     container = run_container()
 
     # Start scanner thread
-    scanner = InteractiveScanner(url, container.devtools_port)
+    scanner = InteractiveScanner(url, container.devtools_port, None)
     scanner.start()
     scanners[container.id] = scanner
 
     # Put some test messages
-    scanner.put_msg(ScannerMessage(MessageType.StartScan, content='asdf'))
+    # scanner.put_msg(ScannerMessage(MessageType.StartScan, content='asdf'))
 
     # Respond
     response_body = json.dumps({"vnc_port": container.vnc_port, "container_id": container.id})
     return Response(response_body, status=200)
+
+
+@app.route('/go_to_website', methods=['POST'])
+def navigate_to_page():
+    print('go to website')
+    scanner = next(iter(scanners.values()))
+    scanner.put_msg(ScannerMessage(MessageType.StartScan, content='asdf'))
+
 
 @app.route('/shutdown')
 def shutdown():
