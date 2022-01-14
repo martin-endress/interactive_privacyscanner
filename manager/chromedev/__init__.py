@@ -122,13 +122,14 @@ class Browser:
         print("connecting websocket")
         await self._await_browser()
         url = "%s/json/version" % self._debugger_url
+        print('connecting to%s' % url)
         async with aiohttp.ClientSession() as session:
             try:
                 async with session.get(url) as response:
                     info = await response.json()
                     print(info)
             except aiohttp.ClientConnectionError as e:
-                raise ConnectionError(str(e))
+                raise ConnectionError(e)
             else:
                 self._websocket_debugger_url = info["webSocketDebuggerUrl"]
         self._conn = await websockets.connect(self._websocket_debugger_url, ping_interval=None, ping_timeout=None)
