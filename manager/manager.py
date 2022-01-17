@@ -24,10 +24,10 @@ def before_request():
 
 @app.route('/start_instance', methods=['POST'])
 def start_instance():
-    '''
-    Starts a scanning instance which includes the container and a manager subprocess.
-    The subprocess can be accessed using a message queue.
-    '''
+    """
+    Starts a scanning instance which includes the container and a chrome manager subprocess.
+    The subprocess is instructed through a message queue.
+    """
     url = request.json['url']
 
     # Start container
@@ -38,19 +38,17 @@ def start_instance():
     scanner.start()
     scanners[container.id] = scanner
 
-    # Put some test messages
-    # scanner.put_msg(ScannerMessage(MessageType.StartScan, content='asdf'))
-
     # Respond
     response_body = json.dumps({"vnc_port": container.vnc_port, "container_id": container.id})
     return Response(response_body, status=200)
 
 
-@app.route('/go_to_website', methods=['POST'])
+@app.route('/start_scan', methods=['POST'])
 def navigate_to_page():
     print('go to website')
     scanner = next(iter(scanners.values()))
-    scanner.put_msg(ScannerMessage(MessageType.StartScan, content='asdf'))
+    scanner.put_msg(ScannerMessage(MessageType.StartScan, content=''))
+
 
 
 @app.route('/shutdown')

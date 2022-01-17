@@ -66,11 +66,7 @@ def run_container():
 
     ports = get_host_ports(container)
     if VNC_PORT not in ports or DEVTOOLS_PORT not in ports:
-        response_body = {
-            "error": "Container port Mapping not correct.",
-            "status": container.status
-        }
-        raise PodmanError("Container port mapping invalid. (status=%s" % container.status)
+        raise PodmanError("Container port mapping invalid. (status=%s)" % container.status)
 
     return Container(container.id, container.name, container.labels, ports[VNC_PORT], ports[DEVTOOLS_PORT])
 
@@ -84,9 +80,11 @@ def get_host_ports(container):
 
 
 def podman_available():
+    """
+    Returns True if Podman service is running correctly.
+    """
     try:
-        podman_client.ping()
-        return True
+        return podman_client.ping()
     except APIError as e:
         print('Error' + str(e))
         return False
