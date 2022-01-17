@@ -1,10 +1,17 @@
 import json
+import logging
 
 from flask import Flask, Response, request
+from podman.errors import PodmanError
 
+import logs
 from interactive_scanner import InteractiveScanner
 from podman_container import run_container, podman_available, stop_container
 from scanner_messages import ScannerMessage, MessageType
+
+logs.configure('scan_manager.log')
+
+logger = logging.getLogger('manager')
 
 # Init flask app
 app = Flask(__name__)
@@ -16,6 +23,7 @@ scanners = dict()
 @app.before_request
 def before_request():
     if not podman_available():
+        logger.error('Podman not available. No action was performed.')
         response_body = json.dumps(
             {"error": "Please start the podman service. ('podman system service -t 0 &')"}
         )
@@ -31,7 +39,12 @@ def start_instance():
     url = request.json['url']
 
     # Start container
+    try:
     container = run_container()
+    except PodmanError as e:
+        msg = str(e)
+        logger.error(msg)
+        return Response(json.dumps({"error": msg}), status=501)
 
     # Start scanner thread
     scanner = InteractiveScanner(url, container.devtools_port, None)

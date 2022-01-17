@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import random
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +16,8 @@ from scanner_messages import ScannerMessage, MessageType
 from utils import slugify, DirectoryFileHandler, event_wait
 
 EXTRACTOR_CLASSES = [CookiesExtractor]
+
+logger = logging.getLogger('cdp_controller')
 
 
 class ScannerInitError(ValueError):
@@ -38,7 +41,6 @@ class UserInteraction:
 
 
 class InteractiveScanner(Thread):
-    # , url, logger, options, debugging_port=9222):
     def __init__(self, url, debugging_port, options):
         super().__init__()
         # Mark this thread as daemon
@@ -50,7 +52,6 @@ class InteractiveScanner(Thread):
         self.event_loop.run_until_complete(init_queue_task)
 
         self.url = url
-        # self.logger = logger
         self.options = options
         self.debugging_port = debugging_port
 
@@ -114,42 +115,40 @@ class InteractiveScanner(Thread):
         async with ChromeBrowser(debugging_port=self.debugging_port) as b:
             self.browser = b
             while True:
-                print('waiting for message')
+                logger.info("Waiting for scanner message.")
                 message = await self._queue.async_q.get()
                 try:
                     r = await self._process_message(message)
                     if r:
                         return
                 except ScannerError as e:
-                    print(e)
-                    print('continuing...')
+                    logger.error(str(e))
+                    continue
 
     async def _process_message(self, message):
-        print('processing message', str(message))
+        logger.info('processing message %s' % str(message))
         match message:
             case ScannerMessage(message_type=MessageType.StartScan):
-                print('navigating to page')
                 await self.navigate_to_page()
             case ScannerMessage(message_type=MessageType.StopScan):
-                print('stopping scan')
                 return True
             case unknown_command:
-                print(f"Unknown command '{unknown_command}' ignored.")
+                raise ScannerError(f"Unknown command '{unknown_command}' ignored.")
         return False
 
     async def navigate_to_page(self):
         await self.browser.Target.setAutoAttach(
             autoAttach=True, waitForDebuggerOnStart=False, flatten=True
         )
-        print('new target')
         self.target = await self.browser.new_target()
+        logger.info("new target created")
 
         # Register domain notifications and callbacks
         await self.register_callbacks()
 
         # Navigate to url
         await self.target.Input.setIgnoreInputEvents(ignore=True)
-        print('nav to page')
+        logger.info("navigating to page")
         await self.target.Page.navigate(url=self.url)
 
         await self.target.BackgroundService.startObserving(service="backgroundFetch")
