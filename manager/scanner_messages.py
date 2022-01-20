@@ -7,9 +7,10 @@ class ScannerMessage:
         self.content = content
 
     def __str__(self):
-        return "[%s] %s" % (str(self.message_type), str(self.content))
+        return "[%s] %s" % (str(self.message_type), str(self.content or ""))
 
 
 class MessageType(Enum):
     StartScan = auto()
+    RegisterInteraction = auto()
     StopScan = auto()

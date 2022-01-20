@@ -1,21 +1,17 @@
 import asyncio
 import json
 import random
-
 from datetime import datetime
-from result import Result
 from pathlib import Path
-from utils import slugify, DirectoryFileHandler, event_wait
 from urllib.parse import urlparse
-from browser import ChromeBrowser, ChromeBrowserStartupError
-from chromedev.extractors import CookiesExtractor
 
+from browser import ChromeBrowser
+from chromedev.extractors import CookiesExtractor
+from errors import ScannerInitError
+from result import Result
+from utils import slugify, DirectoryFileHandler, event_wait
 
 EXTRACTOR_CLASSES = [CookiesExtractor]
-
-
-class ScannerInitError(ValueError):
-    pass
 
 
 def format_result_folder(netloc):
@@ -103,9 +99,9 @@ class InteractiveScanner:
                 self._user_interaction_reason = event_name
                 self._user_interaction.set()
                 return
-        #print("EROOR: %s", reason)
-        #self.debugger_paused = False
-        #print("Debugger resumed")
+        # print("EROOR: %s", reason)
+        # self.debugger_paused = False
+        # print("Debugger resumed")
 
     async def scan(self):
         print("starting scan")

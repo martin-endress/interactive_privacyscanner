@@ -1,10 +1,22 @@
+import json
+from datetime import datetime
+from pathlib import Path
+from urllib.parse import urlparse
+
+import utils
+from errors import ScannerInitError
+from utils import DirectoryFileHandler
+
+
 class Result(object):
     '''
     see https://github.com/PrivacyScore/privacyscanner/blob/master/privacyscanner/result.py
     '''
-    def __init__(self, result_dict, file_handler):
+
+    def __init__(self, result_dict, result_file):
         self._result_dict = result_dict
-        self._file_handler = file_handler
+        self._result_file = result_file
+        self._file_handler = DirectoryFileHandler(result_file.parent)
         self._updated_keys = set()
 
     def add_debug_file(self, filename, contents=None):
@@ -68,3 +80,47 @@ class Result(object):
 
     def get_results(self):
         return self._result_dict
+
+    def store_result(self):
+        try:
+            with self._result_file.open("w") as f:
+                json.dump(self.get_results(),
+                          f, indent=2, sort_keys=True)
+                f.write("\n")
+        except IOError as e:
+            raise ScannerInitError(
+                "Could not write result JSON: {}".format(e)) from e
+
+
+def init_from_scanner(url):
+    site_parsed = urlparse(url)
+    if site_parsed.scheme not in ("http", "https"):
+        raise ScannerInitError("Invalid site url: {}".format(url))
+    # TODO add ability to override this in options
+    results_dir = get_result_path(site_parsed.netloc)
+    if results_dir.exists() or results_dir.is_file():
+        raise ScannerInitError("Folder already exists." + str(results_dir))
+    try:
+        results_dir.mkdir(parents=True)
+    except IOError as e:
+        raise ScannerInitError("Could not create results directory: {}".format(e)) from e
+
+    result_file = results_dir / "results.json"
+    result_json = {"site_url": url,
+                   #   "scan_start": datetime.utcnow(),
+                   "interaction": []}
+    try:
+        with result_file.open("w") as f:
+            json.dump(result_json, f, indent=2)
+            f.write("\n")
+    except IOError as e:
+        raise ScannerInitError(
+            "Could not write result JSON: {}".format(e)) from e
+
+    return Result(result_json, result_file)
+
+
+def get_result_path(netloc):
+    now = datetime.now().strftime("%y-%m-%d_%H-%M")
+    dir_name = "%s_%s" % (utils.slugify(netloc), now)
+    return (Path("results") / dir_name).resolve()

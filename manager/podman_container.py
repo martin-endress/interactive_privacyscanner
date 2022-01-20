@@ -74,7 +74,6 @@ def stop_container(container_id):
         container.stop(timeout=3)
     container = podman_client.containers.get(container_id)
     container.remove(force=True)
-    return
 
 
 def podman_available():

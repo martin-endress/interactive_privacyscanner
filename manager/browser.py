@@ -1,5 +1,6 @@
 from chromedev import Browser
 
+
 class ChromeBrowser:
     def __init__(self, debugging_port=9222):
         self._debugging_port = debugging_port
