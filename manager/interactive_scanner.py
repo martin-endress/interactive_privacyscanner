@@ -79,150 +79,175 @@ class InteractiveScanner(Thread):
         logger.info('processing message %s' % str(message))
         match message:
             case ScannerMessage(message_type=MessageType.StartScan):
-                await self.__navigate_to_page()
+                await self._start_scan()
+            case ScannerMessage(message_type=MessageType.RegisterInteraction):
+                await self.__register_interaction()
             case ScannerMessage(message_type=MessageType.StopScan):
+                await self.__stop_scan()
                 return True
             case unknown_command:
                 raise ScannerError(f"Unknown command '{unknown_command}' ignored.")
         return False
 
-    async def __navigate_to_page(self):
+    async def _start_scan(self):
+        # Create new target and navigate to page
+        self.target = await self._new_target()
+        await self.register_callbacks()
+        await self.target.Input.setIgnoreInputEvents(ignore=True)
+        loaded = await self._navigate_to_page()
+        if not loaded:
+            raise ScannerError("Initial page is not loaded.")
+        # Record information
+        await self._record_information()
+
+    async def _new_target(self):
         await self.browser.Target.setAutoAttach(
             autoAttach=True, waitForDebuggerOnStart=False, flatten=True
         )
-        self.target = await self.browser.new_target()
-        logger.info("new target created")
+        return await self.browser.new_target()
 
-        # Register domain notifications and callbacks
-        await self.register_callbacks()
-
+    async def _navigate_to_page(self):
         # Navigate to url
-        await self.target.Input.setIgnoreInputEvents(ignore=True)
-        logger.info("navigating to page")
+        logger.info("Navigating to Start URL.")
         await self.target.Page.navigate(url=self.url)
-
         await self.target.BackgroundService.startObserving(service="backgroundFetch")
+        return await self.__await_page_load()
 
-        loaded = await self.__await_page_load()
-        return
-        await self.scroll_down_up()
-        await self.__await_page_load()
+    # Activate Debugger breakpoints
+    # for event_name in INTERACTION_BREAKPOINTS:
+    #    await self.target.DOMDebugger.setEventListenerBreakpoint(eventName=event_name)
 
-        # Activate Debugger breakpoints
-        for event_name in INTERACTION_BREAKPOINTS:
-            await self.target.DOMDebugger.setEventListenerBreakpoint(eventName=event_name)
+    async def _record_information(self):
+        target_info = await self.target.Target.getTargetInfo()
+        url = target_info["targetInfo"]["url"]
+        url_parsed = urlparse(url)
+        if not self.start_url_netloc == url_parsed.netloc:
+            logger.info("Site exited, ending scan..")
+            return  # RETURN WITH ERROR
 
-        return
-
-        while True:
-            if loaded:
-                logger.info("Page loaded, extracting info..")
-                target_info = await self.target.Target.getTargetInfo()
-                url = target_info["targetInfo"]["url"]
-                url_parsed = urlparse(url)
-                if not self.start_url_netloc == url_parsed.netloc:
-                    logger.info("Site exited, ending scan..")
-                    break
-                await self.__extract_information(url, self._user_interaction_reason)
-            else:
-                logger.info("no further content was loaded, contining")
-            logger.info('waiting for next input...')
-            self._request_will_be_sent.clear()
-            self._user_interaction.clear()
-            await self.target.Input.setIgnoreInputEvents(ignore=False)
-            self._response_log.clear()
-            if not await utils.event_wait(self._user_interaction, 10):
-                logger.info("no further input, exiting")
-                break
-            await self.target.Input.setIgnoreInputEvents(ignore=True)
-            loaded = await self.__await_page_load()
-        await self.target.close()
-
-    async def __set_page_loaded(self, **kwargs):
-        self._page_loaded.set()
-
-    async def __set_request_will_be_sent(self, **kwargs):
-        self._user_interaction_reason = "request_will_be_sent"
-        self._user_interaction.set()
-
-    async def __response_received(self, response, **kwargs):
-        self._response_log.append(response)
-
-    async def __backgroundServiceEventReceived(self, backgroundServiceEvent, **kwargs):
-        logger.info("Background service Event")
-
-    async def __debugger_paused(self, reason, data, **kwargs):
-        logger.info("Debugger Paused, reason: %s, data: %s" % (reason, data))
-        await self.target.Debugger.resume()
-        self.debugger_paused = True
-        if reason == "EventListener":
-            event_name = data["eventName"]
-            event_name = event_name[len("listener:"):]
-            if event_name in INTERACTION_BREAKPOINTS:
-                self._user_interaction_reason = event_name
-                self._user_interaction.set()
-                return
-        # logger.info("EROOR: %s", reason)
-        # self.debugger_paused = False
-        # logger.info("Debugger resumed")
-
-    async def scroll_down_up(self):
-        layout = await self.target.Page.getLayoutMetrics()
-        height = layout['contentSize']['height']
-        logger.info(height)
-        viewport_height = layout['visualViewport']['clientHeight']
-        viewport_width = layout['visualViewport']['clientWidth']
-        x = random.randint(0, viewport_width - 1)
-        y = random.randint(0, viewport_height - 1)
-        await self.target.Input.setIgnoreInputEvents(ignore=False)
-        await self.target.Input.dispatchMouseEvent(
-            type="mouseWheel", x=x, y=y, deltaX=0, deltaY=height)
-        await asyncio.sleep(0.5)
-        await self.target.Input.dispatchMouseEvent(
-            type="mouseWheel", x=10, y=10, deltaX=0, deltaY=-height)
-        await self.target.Input.setIgnoreInputEvents(ignore=True)
-
-    async def register_callbacks(self):
-        # Enable domain notifications
-        await self.target.Network.enable()
-        await self.target.Page.enable()
-        await self.target.DOM.enable()
-        await self.target.Security.enable()
-        await self.target.Debugger.enable()
-        await self.target.Runtime.enable()
-
-        # Enable callbacks
-        self.target.register_event(
-            "Network.loadingFinished", self.__set_page_loaded)
-        self.target.register_event(
-            "Network.requestWillBeSent", self.__set_request_will_be_sent)
-        self.target.register_event(
-            "Network.responseReceived", self.__response_received)
-        self.target.register_event(
-            "Debugger.paused", self.__debugger_paused)
-        self.target.register_event(
-            "BackgroundService.backgroundServiceEventReceived", self.__backgroundServiceEventReceived)
-
-    async def __await_page_load(self):
-        logger.info("awaiting page load")
-        loaded = await utils.event_wait(self._page_loaded, 0.5)
-        if not loaded:
-            logger.info("no update was made, continuing")
-            return loaded
-        for _ in range(6):
-            await asyncio.sleep(1)
-            self._page_loaded.clear()
-            loaded = await utils.event_wait(self._page_loaded, 2)
-            if not loaded:
-                return True
-        logger.info("ERROR: TIMEOUT on load")
-
-    async def __extract_information(self, url, reason):
-        intermediate_result = {"url": url, "event": reason}
+        intermediate_result = {"url": url, "event": "reason"}
         for extractor_class in EXTRACTOR_CLASSES:
             self._extractors.append(extractor_class(
-                self.target, intermediate_result, logger, self.options))
+                self.target,
+                intermediate_result,
+                logger,
+                self.options
+            ))
 
         for extractor in self._extractors:
             await extractor.extract_information()
         self.result["interaction"].append(intermediate_result)
+
+
+async def __set_page_loaded(self, **kwargs):
+    self._page_loaded.set()
+
+
+async def __set_request_will_be_sent(self, **kwargs):
+    self._user_interaction_reason = "request_will_be_sent"
+    self._user_interaction.set()
+
+
+async def __response_received(self, response, **kwargs):
+    self._response_log.append(response)
+
+
+async def __backgroundServiceEventReceived(self, backgroundServiceEvent, **kwargs):
+    logger.info("Background service Event")
+
+
+async def __debugger_paused(self, reason, data, **kwargs):
+    logger.info("Debugger Paused, reason: %s, data: %s" % (reason, data))
+    await self.target.Debugger.resume()
+    self.debugger_paused = True
+    if reason == "EventListener":
+        event_name = data["eventName"]
+        event_name = event_name[len("listener:"):]
+        if event_name in INTERACTION_BREAKPOINTS:
+            self._user_interaction_reason = event_name
+            self._user_interaction.set()
+            return
+    # logger.info("EROOR: %s", reason)
+    # self.debugger_paused = False
+    # logger.info("Debugger resumed")
+
+
+async def scroll_down_up(self):
+    layout = await self.target.Page.getLayoutMetrics()
+    height = layout['contentSize']['height']
+    logger.info(height)
+    viewport_height = layout['visualViewport']['clientHeight']
+    viewport_width = layout['visualViewport']['clientWidth']
+    x = random.randint(0, viewport_width - 1)
+    y = random.randint(0, viewport_height - 1)
+    await self.target.Input.setIgnoreInputEvents(ignore=False)
+    await self.target.Input.dispatchMouseEvent(
+        type="mouseWheel", x=x, y=y, deltaX=0, deltaY=height)
+    await asyncio.sleep(0.5)
+    await self.target.Input.dispatchMouseEvent(
+        type="mouseWheel", x=10, y=10, deltaX=0, deltaY=-height)
+    await self.target.Input.setIgnoreInputEvents(ignore=True)
+
+
+async def register_callbacks(self):
+    """
+    Register domain notifications and callbacks
+    """
+    # Enable domain notifications
+    await self.target.Network.enable()
+    await self.target.Page.enable()
+    await self.target.DOM.enable()
+    await self.target.Security.enable()
+    await self.target.Debugger.enable()
+    await self.target.Runtime.enable()
+
+    # Enable callbacks
+    self.target.register_event(
+        "Network.loadingFinished", self.__set_page_loaded)
+    self.target.register_event(
+        "Network.requestWillBeSent", self.__set_request_will_be_sent)
+    self.target.register_event(
+        "Network.responseReceived", self.__response_received)
+    self.target.register_event(
+        "Debugger.paused", self.__debugger_paused)
+    self.target.register_event(
+        "BackgroundService.backgroundServiceEventReceived", self.__backgroundServiceEventReceived)
+
+
+async def __await_page_load(self):
+    """
+    Waits until the page is loaded. If no page is loaded, the function returns False. A TimeoutError is raised if the timeout is exceeded.
+    :return:
+    """
+    # TODO improve this (#3)
+    logger.info("awaiting page load")
+    loaded = await utils.event_wait(self._page_loaded, 0.5)
+    if not loaded:
+        logger.info("no update was made, continuing")
+        return loaded
+    for _ in range(6):
+        await asyncio.sleep(1)
+        self._page_loaded.clear()
+        loaded = await utils.event_wait(self._page_loaded, 2)
+        if not loaded:
+            return True
+    raise TimeoutError("Page did not load in time.")
+
+
+async def __extract_information(self, url, reason):
+    intermediate_result = {"url": url, "event": reason}
+    for extractor_class in EXTRACTOR_CLASSES:
+        self._extractors.append(extractor_class(
+            self.target, intermediate_result, logger, self.options))
+
+    for extractor in self._extractors:
+        await extractor.extract_information()
+    self.result["interaction"].append(intermediate_result)
+
+
+def __register_interaction(self):
+    pass
+
+
+def __stop_scan(self):
+    pass
