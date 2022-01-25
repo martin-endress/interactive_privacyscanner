@@ -6,7 +6,7 @@ class CookiesExtractor(Extractor):
         print('extracting cookie info')
         cookies = await self.target.Network.getAllCookies()
         cookies = cookies['cookies']
-        #timestamp = int(self.page.scan_start.timestamp())
+        # timestamp = int(self.page.scan_start.timestamp())
         # for cookie in cookies:
         #     if cookie['session'] or cookie['expires'] is None:
         #         cookie['lifetime'] = -1

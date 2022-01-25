@@ -5,6 +5,7 @@ from flask import Flask, Response, request
 from podman.errors import PodmanError
 
 import logs
+from urllib.parse import urlparse
 from interactive_scanner import InteractiveScanner
 from podman_container import run_container, podman_available, stop_container
 from scanner_messages import ScannerMessage, MessageType
@@ -38,7 +39,15 @@ def start_instance():
     Starts a scanning instance which includes the container and a chrome manager subprocess.
     The subprocess is instructed through a message queue.
     """
+    if request.json == None:
+        return Response(json.dumps({"error": 'Request must be a json containing the URL.'}), status=400)
     url = request.json['url']
+    try:
+        urlparse(url)
+    except ValueError as e:
+        msg = str(e)
+        logger.error(msg)
+        return Response(json.dumps({"error": msg}), status=400)
 
     # Start container
     try:
@@ -46,12 +55,12 @@ def start_instance():
     except PodmanError as e:
         msg = str(e)
         logger.error(msg)
-        return Response(json.dumps({"error": msg}), status=501)
+        return Response(json.dumps({"error": msg}), status=503)
 
     # Start scanner thread
     scanner = InteractiveScanner(url, container.devtools_port, None)
-    scanner.start()
-    scanners[container.id] = scanner
+    # scanner.start()
+    # scanners[container.id] = scanner
 
     # Respond
     response_body = json.dumps({"vnc_port": container.vnc_port, "container_id": container.id})
