@@ -25,27 +25,27 @@ class UserInteraction:
 
 
 class InteractiveScanner(Thread):
-    def _init_(self, url, debugging_port, options):
+    def __init__(self, url, debugging_port, options):
         super().__init__()
         # Mark this thread as daemon
         self.daemon = True
 
         # Init Message Queue
-        #self.event_loop = asyncio.new_event_loop()
-        #init_queue_task = self.event_loop.create_task(self._init_queue())
-        #self.event_loop.run_until_complete(init_queue_task)
-#
-        ## Init Scanner
-        #self.url = url
-        #self.start_url_netloc = urlparse(url).netloc
-        #self.options = options
-        #self.debugging_port = debugging_port
-        #self.result = result.init_from_scanner(url)
-        #self._extractors = []
-        #self._page_loaded = asyncio.Event()
-        #self._request_will_be_sent = asyncio.Event()
-        #self._response_log = []
-        #self._user_interaction = asyncio.Event()
+        self.event_loop = asyncio.new_event_loop()
+        init_queue_task = self.event_loop.create_task(self._init_queue())
+        self.event_loop.run_until_complete(init_queue_task)
+
+        # Init Scanner
+        self.url = url
+        self.start_url_netloc = urlparse(url).netloc
+        self.options = options
+        self.debugging_port = debugging_port
+        self.result = result.init_from_scanner(url)
+        self._extractors = []
+        self._page_loaded = asyncio.Event()
+        self._request_will_be_sent = asyncio.Event()
+        self._response_log = []
+        self._user_interaction = asyncio.Event()
 
     async def _init_queue(self):
         self._queue = janus.Queue()

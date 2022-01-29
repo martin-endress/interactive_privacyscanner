@@ -50,6 +50,7 @@ def run_container():
     container = podman_client.containers.run(
         image=CHROME_IMAGE_TAG,
         ports=port_mapping,
+        remove=True,
         detach=True
     )
 
@@ -71,9 +72,9 @@ def stop_container(container_id):
         raise PodmanError(e)
 
     if container.status == "running":
-        container.stop(timeout=3)
-    container = podman_client.containers.get(container_id)
-    container.remove(force=True)
+        container.stop(timeout=5)
+    else:
+        raise PodmanError('Status of the container.')
 
 
 def podman_available():
@@ -83,7 +84,7 @@ def podman_available():
     try:
         return podman_client.ping()
     except APIError as e:
-        print('Error' + str(e))
+        logger.error('Error %s' % str(e))
         return False
 
 

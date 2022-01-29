@@ -26,7 +26,9 @@ def before_request():
     if not podman_available():
         logger.error('Podman not available. No action was performed.')
         response_body = json.dumps(
-            {"error": "Please start the podman service. ('podman system service -t 0 &')"}
+            {
+                "error": "Please start the podman service ('podman system service -t 0 &')" +
+                         " or enable systemd user unit podman.service"}
         )
         return Response(response_body, status=500, mimetype="application/json")
     # continue with request
@@ -59,8 +61,8 @@ def start_instance():
 
     # Start scanner thread
     scanner = InteractiveScanner(url, container.devtools_port, None)
-    # scanner.start()
-    # scanners[container.id] = scanner
+    scanner.start()
+    scanners[container.id] = scanner
 
     # Respond
     response_body = json.dumps({"vnc_port": container.vnc_port, "container_id": container.id})
