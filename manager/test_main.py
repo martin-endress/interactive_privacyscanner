@@ -1,7 +1,4 @@
-from podman_container import build_container_image
-from celery import Celery
+print('test')
 
 
-
-rabbit = '0.0.0.0:5672'
-
+# journalctl -u privacyscanner_browser > privacyscanner_browser.txt

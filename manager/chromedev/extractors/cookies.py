@@ -1,9 +1,12 @@
+import logging
+
 from chromedev.extractors.base import Extractor
 
+logger = logging.getLogger('cookie_extractor')
 
 class CookiesExtractor(Extractor):
     async def extract_information(self):
-        print('extracting cookie info')
+        logger.info('extracting cookie info')
         cookies = await self.target.Network.getAllCookies()
         cookies = cookies['cookies']
         # timestamp = int(self.page.scan_start.timestamp())

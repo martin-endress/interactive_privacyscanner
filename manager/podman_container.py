@@ -74,7 +74,7 @@ def stop_container(container_id):
     if container.status == "running":
         container.stop(timeout=5)
     else:
-        raise PodmanError('Status of the container.')
+        raise PodmanError('Container is not running.')
 
 
 def podman_available():

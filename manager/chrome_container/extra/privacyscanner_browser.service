@@ -7,7 +7,7 @@ After=privacyscanner_vnc.service
 Environment=DISPLAY=:1.0
 # See https://github.com/GoogleChrome/chrome-launcher/blob/master/docs/chrome-flags-for-tools.md
 # and https://peter.sh/experiments/chromium-command-line-switches/
-ExecStart=chromium-browser --disable-background-networking --disable-sync --metrics-recording-only --disable-default-apps --mute-audio --no-first-run --disable-background-timer-throttling --disable-client-side-phishing-detection --disable-popup-blocking --disable-prompt-on-repost --enable-automation --password-store=basic --use-mock-keychain --disable-component-update --autoplay-policy=no-user-gesture-required --disable-notifications --disable-hang-monitor --user_data_dir=/home/chrome/chrome-profile --remote-debugging-port=9222
+ExecStart=chromium-browser --disable-background-networking --disable-domain-reliability --disable-device-discovery-notifications --disable-sync --metrics-recording-only --disable-default-apps --mute-audio --no-first-run --disable-background-timer-throttling --disable-client-side-phishing-detection --disable-popup-blocking --disable-prompt-on-repost --enable-automation --password-store=basic --use-mock-keychain --disable-component-update --autoplay-policy=no-user-gesture-required --disable-notifications --disable-hang-monitor --user_data_dir=/home/chrome/chrome-profile --remote-debugging-port=9222
 Restart=always
 RestartSec=10
 WorkingDirectory=/opt/privacyscanner/browser

@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 
 import janus
 
+import podman_container
 import result
 import utils
 from browser import ChromeBrowser
@@ -15,8 +16,6 @@ from scanner_messages import ScannerMessage, MessageType
 
 EXTRACTOR_CLASSES = [CookiesExtractor]
 INTERACTION_BREAKPOINTS = ["focus", "click", "mouseWheel"]
-
-logger = logging.getLogger('cdp_controller')
 
 
 class UserInteraction:
@@ -29,6 +28,7 @@ class InteractiveScanner(Thread):
         super().__init__()
         # Mark this thread as daemon
         self.daemon = True
+        self.logger = logging.getLogger('cdp_controller_%s' % self.name)
 
         # Init Message Queue
         self.event_loop = asyncio.new_event_loop()
@@ -46,6 +46,7 @@ class InteractiveScanner(Thread):
         self._request_will_be_sent = asyncio.Event()
         self._response_log = []
         self._user_interaction = asyncio.Event()
+        self.stop_scan_event = asyncio.Event()
 
     async def _init_queue(self):
         self._queue = janus.Queue()
@@ -65,26 +66,26 @@ class InteractiveScanner(Thread):
         async with ChromeBrowser(debugging_port=self.debugging_port) as b:
             self.browser = b
             while True:
-                logger.info("Waiting for scanner message.")
+                self.logger.info("Waiting for scanner message.")
                 message = await self._queue.async_q.get()
                 try:
                     r = await self._process_message(message)
                     if r:
-                        logger.info('Scan complete, terminating thread.')
+                        self.logger.info('Scan complete, terminating thread.')
                         return
                 except ScannerError as e:
-                    logger.error(str(e))
+                    self.logger.error(str(e))
                     continue
 
     async def _process_message(self, message):
-        logger.info('processing message %s' % str(message))
+        self.logger.info('processing message %s' % str(message))
         match message:
             case ScannerMessage(message_type=MessageType.StartScan):
                 await self._start_scan()
             case ScannerMessage(message_type=MessageType.RegisterInteraction):
                 await self._register_interaction()
             case ScannerMessage(message_type=MessageType.StopScan):
-                await self._stop_scan()
+                await self._stop_scan(message.content)
                 return True
             case unknown_command:
                 raise ScannerError(f"Unknown command '{unknown_command}' ignored.")
@@ -99,7 +100,7 @@ class InteractiveScanner(Thread):
         if not loaded:
             raise ScannerError("Initial page is not loaded.")
         # Record information
-        await self._record_information()
+        await self._record_information('initial scan')
         # Allow inputs
         await self.target.Input.setIgnoreInputEvents(ignore=False)
 
@@ -111,7 +112,7 @@ class InteractiveScanner(Thread):
 
     async def _navigate_to_page(self):
         # Navigate to url
-        logger.info("Navigating to Start URL.")
+        self.logger.info("Navigating to Start URL.")
         await self.target.Page.navigate(url=self.url)
         await self.target.BackgroundService.startObserving(service="backgroundFetch")
         return await self._await_page_load()
@@ -120,15 +121,15 @@ class InteractiveScanner(Thread):
     # for event_name in INTERACTION_BREAKPOINTS:
     #    await self.target.DOMDebugger.setEventListenerBreakpoint(eventName=event_name)
 
-    async def _record_information(self):
+    async def _record_information(self, reason):
         target_info = await self.target.Target.getTargetInfo()
         url = target_info["targetInfo"]["url"]
         url_parsed = urlparse(url)
         if not self.start_url_netloc == url_parsed.netloc:
-            logger.info("Site exited, ending scan..")
-            return  # RETURN WITH ERROR
+            self.logger.info("Site exited, ending scan..")
+            return  # TODO RETURN WITH ERROR
 
-        intermediate_result = {"url": url, "event": "reason"}
+        intermediate_result = {"url": url, "event": reason}
         for extractor_class in EXTRACTOR_CLASSES:
             self._extractors.append(extractor_class(
                 self.target,
@@ -142,14 +143,14 @@ class InteractiveScanner(Thread):
 
     async def _register_interaction(self):
         await self.target.Input.setIgnoreInputEvents(ignore=True)
-        await self._record_information()
+        await self._record_information('manual interaction')
         await self.target.Input.setIgnoreInputEvents(ignore=False)
 
-    async def _stop_scan(self):
+    async def _stop_scan(self, container_id):
         await self.target.Input.setIgnoreInputEvents(ignore=True)
-        await self._record_information()
+        await self._record_information('end scan')
         self.result.store_result()
-        pass
+        podman_container.stop_container(container_id)
 
     async def _set_page_loaded(self, **kwargs):
         self._page_loaded.set()
@@ -162,10 +163,10 @@ class InteractiveScanner(Thread):
         self._response_log.append(response)
 
     async def _backgroundServiceEventReceived(self, backgroundServiceEvent, **kwargs):
-        logger.info("Background service Event")
+        self.logger.info("Background service Event")
 
     async def _debugger_paused(self, reason, data, **kwargs):
-        logger.info("Debugger Paused, reason: %s, data: %s" % (reason, data))
+        self.logger.info("Debugger Paused, reason: %s, data: %s" % (reason, data))
         await self.target.Debugger.resume()
         self.debugger_paused = True
         if reason == "EventListener":
@@ -175,14 +176,14 @@ class InteractiveScanner(Thread):
                 self._user_interaction_reason = event_name
                 self._user_interaction.set()
                 return
-        # logger.info("EROOR: %s", reason)
+        # self.logger.info("EROOR: %s", reason)
         # self.debugger_paused = False
-        # logger.info("Debugger resumed")
+        # self.logger.info("Debugger resumed")
 
     async def scroll_down_up(self):
         layout = await self.target.Page.getLayoutMetrics()
         height = layout['contentSize']['height']
-        logger.info(height)
+        self.logger.info(height)
         viewport_height = layout['visualViewport']['clientHeight']
         viewport_width = layout['visualViewport']['clientWidth']
         x = random.randint(0, viewport_width - 1)
@@ -225,10 +226,10 @@ class InteractiveScanner(Thread):
         :return:
         """
         # TODO improve this (#3)
-        logger.info("awaiting page load")
+        self.logger.info("awaiting page load")
         loaded = await utils.event_wait(self._page_loaded, 0.5)
         if not loaded:
-            logger.info("no update was made, continuing")
+            self.logger.info("no update was made, continuing")
             return loaded
         for _ in range(6):
             await asyncio.sleep(1)
@@ -237,11 +238,3 @@ class InteractiveScanner(Thread):
             if not loaded:
                 return True
         raise TimeoutError("Page did not load in time.")
-
-
-def _register_interaction(self):
-    pass
-
-
-def _stop_scan(self):
-    pass
