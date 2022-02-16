@@ -1,10 +1,13 @@
 import asyncio
+import logging
 import os
 import sys
 from collections import defaultdict
 
 import aiohttp
 import websockets
+
+logger = logging.getLogger('chrome_devtools_api')
 
 try:
     import orjson as json
@@ -83,7 +86,7 @@ class Session:
 
     def __getattr__(self, name: str):
         if not name.istitle():
-            print("\"" + name + "\"is not a title, using it anyways...")
+            logger.warning("\"" + name + "\"is not a title, using it anyways...")
         proxy = MethodGroupProxy(name, self._browser, self._session_id)
         self.__dict__[name] = proxy
         return proxy
@@ -115,33 +118,31 @@ class Browser:
         self._failed_events = []
 
     async def _await_browser(self, timeout=5):
-        print('awaiting browser')
+        logger.info('awaiting browser')
         await asyncio.sleep(3)
 
     async def start(self, timeout=None):
-        print("connecting websocket")
         await self._await_browser()
         url = "%s/json/version" % self._debugger_url
-        print('connecting to%s' % url)
+        logger.info('connecting to websocket %s' % url)
         async with aiohttp.ClientSession() as session:
             try:
                 async with session.get(url) as response:
                     info = await response.json()
-                    print(info)
+                    logger.info('debugger URL: %s' % info)
             except aiohttp.ClientConnectionError as e:
                 raise ConnectionError(e)
             else:
                 self._websocket_debugger_url = info["webSocketDebuggerUrl"]
         self._conn = await websockets.connect(self._websocket_debugger_url, ping_interval=None, ping_timeout=None)
         if self._debug:
-            print("! Websocket connected", file=sys.stderr)
+            logger.info("! Websocket connected")
         self._recv_task = self._loop.create_task(self._recv_loop())
 
     async def _send_raw(self, json_msg):
         if self._debug:
-            print("> %s" % json_msg, file=sys.stderr)
-        msg = json.dumps(json_msg).decode(
-        ) if is_orjson else json.dumps(json_msg)
+            logger.info("> %s" % json_msg)
+        msg = json.dumps(json_msg).decode() if is_orjson else json.dumps(json_msg)
         await self._conn.send(msg)
 
     async def call_method(self, method_name, params=None, session_id=None):
@@ -173,17 +174,15 @@ class Browser:
                 msg = json.loads(await self._conn.recv())
             except websockets.ConnectionClosed:
                 if self._debug:
-                    print("! Closed websocket connection.", file=sys.stderr)
+                    logger.info("! Closed websocket connection.")
                 break
             if self._debug:
-                if "sessionId" in msg and "method" in msg:
-                    if msg["method"] == "Debugger.paused":
-                        print("< %s" % msg, file=sys.stderr)
-                    else:
-                        print("< method: %s, sessionId: %s" %
-                              (msg["method"], msg["sessionId"]), file=sys.stderr)
+                if "sessionId" in msg and \
+                        "method" in msg and \
+                        msg["method"] not in ["Debugger.paused", "Inspector.detached"]:
+                    logger.info("< method: %s, sessionId: %s" % (msg["method"], msg["sessionId"]))
                 else:
-                    print("< %s" % msg, file=sys.stderr)
+                    logger.info("< %s" % msg)
             if "id" in msg:
                 future = self._results[msg["id"]]
                 if "error" in msg:
@@ -250,13 +249,13 @@ class BrowserTest:
             debugger_url='http://127.0.0.1:9222', debug=True)
 
     async def attachedToTarget(self, **info):
-        print("I WAS CALLED")
+        logger.info("attach to target function start.")
         session = self.browser.get_session(info["sessionId"])
         await session.Target.activateTarget(targetId=info["targetInfo"]["targetId"])
-        print("DONE")
+        logger.info("attach to target function end.")
 
     def frame_resized(self):
-        print('frame resized')
+        logger.info('frame resized')
 
     async def test(self):
         url = "https://privacyscore.org/"

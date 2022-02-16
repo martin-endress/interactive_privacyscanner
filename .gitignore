@@ -1,6 +1,6 @@
+## Additional Ignores
 
-# Created by https://www.toptal.com/developers/gitignore/api/python,pycharm
-# Edit at https://www.toptal.com/developers/gitignore?templates=python,pycharm
+bin/
 
 ### PyCharm ###
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider
@@ -130,6 +130,7 @@ eggs/
 .eggs/
 lib/
 lib64/
+lib64
 parts/
 sdist/
 var/

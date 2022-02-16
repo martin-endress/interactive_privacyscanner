@@ -1,3 +1,4 @@
-from podman_container import build_container_image
+print('test')
 
-build_container_image()
+
+# journalctl -u privacyscanner_browser > privacyscanner_browser.txt

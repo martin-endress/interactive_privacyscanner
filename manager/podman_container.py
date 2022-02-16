@@ -49,8 +49,14 @@ def run_container():
     }
     container = podman_client.containers.run(
         image=CHROME_IMAGE_TAG,
+        # ports (Dict[str, Union[int, Tuple[str, int], List[int]]]): Ports to bind inside the container.
         ports=port_mapping,
-        detach=True
+        # remove (bool): Remove the container when it has finished running. Default: False.
+        remove=True,
+        # detach (bool): Run container in the background and return a Container object.
+        detach=True,
+        # shm_size (Union[str, int]): Size of /dev/shm (e.g. 1G).
+        shm_size="2g"
     )
 
     if container.status != "running":
@@ -71,9 +77,9 @@ def stop_container(container_id):
         raise PodmanError(e)
 
     if container.status == "running":
-        container.stop(timeout=3)
-    container = podman_client.containers.get(container_id)
-    container.remove(force=True)
+        container.stop(timeout=5)
+    else:
+        raise PodmanError('Container is not running.')
 
 
 def podman_available():
@@ -83,7 +89,7 @@ def podman_available():
     try:
         return podman_client.ping()
     except APIError as e:
-        print('Error' + str(e))
+        logger.error('Error %s' % str(e))
         return False
 
 
