@@ -49,9 +49,14 @@ def run_container():
     }
     container = podman_client.containers.run(
         image=CHROME_IMAGE_TAG,
+        # ports (Dict[str, Union[int, Tuple[str, int], List[int]]]): Ports to bind inside the container.
         ports=port_mapping,
+        # remove (bool): Remove the container when it has finished running. Default: False.
         remove=True,
-        detach=True
+        # detach (bool): Run container in the background and return a Container object.
+        detach=True,
+        # shm_size (Union[str, int]): Size of /dev/shm (e.g. 1G).
+        shm_size="2g"
     )
 
     if container.status != "running":
