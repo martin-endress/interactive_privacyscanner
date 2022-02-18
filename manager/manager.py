@@ -106,7 +106,7 @@ def stop_scan():
         return Response('Client Error: %s' % str(e), status=400)
 
 
-@app.route('/stan_status', methods=['GET'])
+@app.route('/scan_status', methods=['GET'])
 def status():
     return Response("", status=200)
 
