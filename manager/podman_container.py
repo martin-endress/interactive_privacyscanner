@@ -56,7 +56,7 @@ def run_container():
         # detach (bool): Run container in the background and return a Container object.
         detach=True,
         # shm_size (Union[str, int]): Size of /dev/shm (e.g. 1G).
-        shm_size="2g"
+        shm_size=2 * 2 ** (10 * 3)  # 2gb, str does not work for some reason
     )
 
     if container.status != "running":
