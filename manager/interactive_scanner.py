@@ -17,6 +17,8 @@ from scanner_messages import ScannerMessage, MessageType
 EXTRACTOR_CLASSES = [CookiesExtractor]
 INTERACTION_BREAKPOINTS = ["focus", "click", "mouseWheel"]
 
+logger = logging.getLogger('scanner')
+
 
 class UserInteraction:
     def _init_(self):
@@ -130,16 +132,18 @@ class InteractiveScanner(Thread):
             return  # TODO RETURN WITH ERROR
 
         intermediate_result = {"url": url, "event": reason}
+        self._extractors.clear()
         for extractor_class in EXTRACTOR_CLASSES:
             self._extractors.append(extractor_class(
                 self.target,
-                intermediate_result,
                 self.options
             ))
 
         for extractor in self._extractors:
-            await extractor.extract_information()
-        self.result["interaction"].append(intermediate_result)
+            extractor_info = await extractor.extract_information()
+            intermediate_result = intermediate_result | extractor_info.copy()
+
+        self.result["interaction"].append(intermediate_result.copy())
 
     async def _register_interaction(self):
         await self.target.Input.setIgnoreInputEvents(ignore=True)

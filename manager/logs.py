@@ -3,7 +3,7 @@ from logging import StreamHandler
 from logging.handlers import RotatingFileHandler
 
 
-def configure(file_name, file_level=logging.DEBUG, console_level=logging.WARNING):
+def configure(file_name, file_level=logging.DEBUG, console_level=logging.DEBUG):
     # create handlers
     log_filename = 'logs/%s' % file_name
     fh = RotatingFileHandler(filename=log_filename, backupCount=10, maxBytes=50000)
