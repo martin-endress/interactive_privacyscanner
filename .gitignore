@@ -3,6 +3,14 @@
 bin/
 /manager/results
 
+### Elm ###
+frontend/elm.js
+# elm-package generated files
+elm-stuff
+# elm-repl generated files
+repl-temp-*
+
+
 ### PyCharm ###
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider
 # Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
