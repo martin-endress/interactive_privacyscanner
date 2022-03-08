@@ -128,8 +128,8 @@ class InteractiveScanner(Thread):
         url = target_info["targetInfo"]["url"]
         url_parsed = urlparse(url)
         if not self.start_url_netloc == url_parsed.netloc:
-            self.logger.info("Site exited, ending scan..")
-            return  # TODO RETURN WITH ERROR
+            self.logger.warning("Site exited or forwarded..")
+            # return  # TODO RETURN WITH ERROR
 
         intermediate_result = {"url": url, "event": reason}
         self._extractors.clear()
@@ -142,8 +142,20 @@ class InteractiveScanner(Thread):
         for extractor in self._extractors:
             extractor_info = await extractor.extract_information()
             intermediate_result = intermediate_result | extractor_info.copy()
-
+        intermediate_result['third parties'] = self.list_third_parties()
+        self._response_log.clear()
         self.result["interaction"].append(intermediate_result.copy())
+
+    def list_third_parties(self):
+        third_parties = list()
+        for entry in self._response_log:
+            url = urlparse(entry['url'])
+            if url.netloc != self.start_url_netloc:
+                content_type = 'not specified'
+                if 'Content-Type' in entry['headers']:
+                    content_type = entry['headers']['Content-Type']
+                third_parties.append({'url': url.netloc, 'Content-Type': content_type})
+        return third_parties
 
     async def _register_interaction(self):
         await self.target.Input.setIgnoreInputEvents(ignore=True)
