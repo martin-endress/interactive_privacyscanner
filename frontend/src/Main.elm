@@ -3,7 +3,7 @@ module Main exposing (main)
 import Browser
 import Html exposing (Html, div, text)
 import Html.Attributes exposing (class)
-import Page.ScanPage
+import Page.ScanPage as ScanPage
 import Route exposing (Route)
 
 
@@ -15,7 +15,11 @@ type alias Model =
 
 type Page
     = Blank
-    | ScanPage Page.ScanPage.Model
+    | ScanPage ScanPage.Model
+
+
+
+-- MAIN
 
 
 main : Program () Model Msg
@@ -37,7 +41,7 @@ initModel : Model
 initModel =
     let
         scanModel =
-            Page.ScanPage.init
+            ScanPage.init
     in
     { page = ScanPage scanModel
     , currentRoute = Just Route.Status
@@ -56,12 +60,12 @@ viewPage model =
             text ""
 
         ScanPage subModel ->
-            Page.ScanPage.view subModel
+            ScanPage.view subModel
                 |> Html.map ScanPageMsg
 
 
 type Msg
-    = ScanPageMsg Page.ScanPage.Msg
+    = ScanPageMsg ScanPage.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -87,9 +91,9 @@ updatePage msg model =
             ( model, Cmd.none )
 
         ( ScanPage subModel, ScanPageMsg subMsg ) ->
-            toPage ScanPage ScanPageMsg Page.ScanPage.update subMsg subModel
+            toPage ScanPage ScanPageMsg ScanPage.update subMsg subModel
 
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.none
+    Sub.map ScanPageMsg ScanPage.messageSubscription
