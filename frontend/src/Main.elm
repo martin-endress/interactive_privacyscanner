@@ -1,8 +1,7 @@
 module Main exposing (main)
 
 import Browser
-import Html exposing (Html, div, text)
-import Html.Attributes exposing (class)
+import Html exposing (Html, text)
 import Page.ScanPage as ScanPage
 import Route exposing (Route)
 
@@ -11,6 +10,10 @@ type alias Model =
     { page : Page
     , currentRoute : Maybe Route
     }
+
+
+type Msg
+    = ScanPageMsg ScanPage.Msg
 
 
 type Page
@@ -32,6 +35,10 @@ main =
         }
 
 
+
+-- INIT
+
+
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( initModel, Cmd.none )
@@ -46,6 +53,10 @@ initModel =
     { page = ScanPage scanModel
     , currentRoute = Just Route.Status
     }
+
+
+
+-- VIEW
 
 
 view : Model -> Html Msg
@@ -64,8 +75,8 @@ viewPage model =
                 |> Html.map ScanPageMsg
 
 
-type Msg
-    = ScanPageMsg ScanPage.Msg
+
+-- UPDATE
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -92,6 +103,10 @@ updatePage msg model =
 
         ( ScanPage subModel, ScanPageMsg subMsg ) ->
             toPage ScanPage ScanPageMsg ScanPage.update subMsg subModel
+
+
+
+-- SUBSCRIPTIONS
 
 
 subscriptions : Model -> Sub Msg

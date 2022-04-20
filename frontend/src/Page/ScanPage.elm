@@ -2,7 +2,7 @@ port module Page.ScanPage exposing (..)
 
 import Html exposing (Html, button, div, h2, input, label, span, text)
 import Html.Attributes exposing (attribute, class, style)
-import Html.Events exposing (onClick, onInput, onMouseEnter, onMouseLeave, onMouseOver)
+import Html.Events exposing (onClick, onInput, onMouseEnter, onMouseLeave)
 
 
 type alias Model =
