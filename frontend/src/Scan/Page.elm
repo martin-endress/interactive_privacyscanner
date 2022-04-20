@@ -1,12 +1,15 @@
-port module Page.ScanPage exposing (..)
+port module Scan.Page exposing (..)
 
 import Html exposing (Html, button, div, h2, input, label, span, text)
 import Html.Attributes exposing (attribute, class, style)
 import Html.Events exposing (onClick, onInput, onMouseEnter, onMouseLeave)
+import Http
+import Json.Decode as D
 
 
 type alias Model =
-    { urlInput : String
+    { status : Bool -- status represents the scanning status
+    , urlInput : String
     , guacamoleFocus : Bool
     , guacamoleErrors : List String
     }
@@ -18,6 +21,7 @@ type Msg
     | StartScan
     | ReceiveGuacamoleError String
     | SetGuacamoleFocus Bool
+    | GotStartResult (Result Http.Error ContainerStartInfo)
 
 
 
@@ -39,7 +43,8 @@ port messageReceiver : (String -> msg) -> Sub msg
 
 init : Model
 init =
-    { urlInput = ""
+    { status = False
+    , urlInput = ""
     , guacamoleFocus = False
     , guacamoleErrors = []
     }
@@ -90,6 +95,36 @@ update msg model =
             ( { model | guacamoleFocus = val }
             , setGuacamoleFocus val
             )
+
+        GotStartResult result ->
+            case result of
+                Ok containerInfo ->
+                    ( model, Cmd.none )
+
+                Err error ->
+                    ( model, Cmd.none )
+
+
+type alias ContainerStartInfo =
+    { vnc_port : Int
+    , container_id : Int
+    }
+
+
+startContainerInstance : String -> Cmd Msg
+startContainerInstance scanUrl =
+    Http.post
+        { url = ""
+        , body = Http.emptyBody
+        , expect = Http.expectJson GotStartResult startContainerResultDecoder
+        }
+
+
+startContainerResultDecoder : D.Decoder ContainerStartInfo
+startContainerResultDecoder =
+    D.map2 ContainerStartInfo
+        (D.field "vnc_port" D.int)
+        (D.field "container_id" D.int)
 
 
 messageSubscription : Sub Msg

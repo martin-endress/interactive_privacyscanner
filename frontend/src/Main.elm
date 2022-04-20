@@ -2,8 +2,8 @@ module Main exposing (main)
 
 import Browser
 import Html exposing (Html, text)
-import Page.ScanPage as ScanPage
 import Route exposing (Route)
+import Scan.Page as ScanPage
 
 
 type alias Model =
