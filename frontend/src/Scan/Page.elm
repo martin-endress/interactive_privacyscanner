@@ -4,7 +4,8 @@ import Html exposing (Html, button, div, h2, input, label, span, text)
 import Html.Attributes exposing (attribute, class, style)
 import Html.Events exposing (onClick, onInput, onMouseEnter, onMouseLeave)
 import Http
-import Json.Decode as D
+import Scan.Data exposing (ContainerStartInfo)
+import Scan.Requests as Requests
 
 
 type alias Model =
@@ -68,17 +69,11 @@ update msg model =
             )
 
         StartScan ->
-            {--
-            //url_in = document.getElementById("url_input").value
-            //requests.post(manager_url + "start_instance", json={"url": url}).json()
-            //var xhr = new XMLHttpRequest();
-            //xhr.open("POST", "http://localhost:5000/start_instance", false);
-            //xhr.setRequestHeader('Content-Type', 'application/json');
-            //xhr.send(JSON.stringify({
-            //    url: url_in
-            //}));
-        --}
-            ( model, connectTunnel 5900 )
+            let
+                startContainer =
+                    Requests.startContainerInstance GotStartResult model.urlInput
+            in
+            ( model, startContainer )
 
         ReceiveGuacamoleError guacamoleMessage ->
             let
@@ -97,34 +92,16 @@ update msg model =
             )
 
         GotStartResult result ->
+            let
+                _ =
+                    Debug.log "got result" result
+            in
             case result of
                 Ok containerInfo ->
                     ( model, Cmd.none )
 
                 Err error ->
                     ( model, Cmd.none )
-
-
-type alias ContainerStartInfo =
-    { vnc_port : Int
-    , container_id : Int
-    }
-
-
-startContainerInstance : String -> Cmd Msg
-startContainerInstance scanUrl =
-    Http.post
-        { url = ""
-        , body = Http.emptyBody
-        , expect = Http.expectJson GotStartResult startContainerResultDecoder
-        }
-
-
-startContainerResultDecoder : D.Decoder ContainerStartInfo
-startContainerResultDecoder =
-    D.map2 ContainerStartInfo
-        (D.field "vnc_port" D.int)
-        (D.field "container_id" D.int)
 
 
 messageSubscription : Sub Msg
