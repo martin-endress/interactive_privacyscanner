@@ -1,18 +1,19 @@
 port module Scan.Page exposing (..)
 
-import Html exposing (Html, button, div, h2, input, label, span, text)
-import Html.Attributes exposing (attribute, class, style)
+import Html exposing (Html, button, div, h2, input, label, li, span, text, ul)
+import Html.Attributes exposing (attribute, class, classList, style)
 import Html.Events exposing (onClick, onInput, onMouseEnter, onMouseLeave)
-import Http
-import Scan.Data exposing (ContainerStartInfo)
+import Http exposing (Metadata)
+import Http.Detailed exposing (Error)
+import Scan.Data as Data exposing (ContainerStartInfo, ScanStatus(..), ServerError)
 import Scan.Requests as Requests
 
 
 type alias Model =
-    { status : Bool -- status represents the scanning status
+    { status : ScanStatus
     , urlInput : String
     , guacamoleFocus : Bool
-    , guacamoleErrors : List String
+    , errors : List ServerError
     }
 
 
@@ -22,7 +23,7 @@ type Msg
     | StartScan
     | ReceiveGuacamoleError String
     | SetGuacamoleFocus Bool
-    | GotStartResult (Result Http.Error ContainerStartInfo)
+    | GotStartResult (Result (Error String) ( Metadata, ContainerStartInfo ))
 
 
 
@@ -44,10 +45,10 @@ port messageReceiver : (String -> msg) -> Sub msg
 
 init : Model
 init =
-    { status = False
+    { status = Idle
     , urlInput = ""
     , guacamoleFocus = False
-    , guacamoleErrors = []
+    , errors = []
     }
 
 
@@ -72,16 +73,22 @@ update msg model =
             let
                 startContainer =
                     Requests.startContainerInstance GotStartResult model.urlInput
+
+                newModel =
+                    { model
+                        | status = StartingContainer model.urlInput
+                    }
             in
-            ( model, startContainer )
+            ( newModel
+            , startContainer
+            )
 
         ReceiveGuacamoleError guacamoleMessage ->
-            let
-                _ =
-                    Debug.log "GUACAMOLE ERROR" guacamoleMessage
-            in
             ( { model
-                | guacamoleErrors = guacamoleMessage :: model.guacamoleErrors
+                | errors =
+                    { msg = guacamoleMessage
+                    }
+                        :: model.errors
               }
             , Cmd.none
             )
@@ -92,16 +99,29 @@ update msg model =
             )
 
         GotStartResult result ->
-            let
-                _ =
-                    Debug.log "got result" result
-            in
             case result of
-                Ok containerInfo ->
-                    ( model, Cmd.none )
+                Ok ( _, containerInfo ) ->
+                    let
+                        ( newModel, vncPort ) =
+                            updateStartContainer containerInfo model
+                    in
+                    ( newModel
+                    , connectTunnel vncPort
+                    )
 
                 Err error ->
-                    ( model, Cmd.none )
+                    ( { model
+                        | errors = Data.errorFromResponse error :: model.errors
+                      }
+                    , Cmd.none
+                    )
+
+
+updateStartContainer : ContainerStartInfo -> Model -> ( Model, Int )
+updateStartContainer startInfo model =
+    ( { model | status = Connecting startInfo }
+    , startInfo.vnc_port
+    )
 
 
 messageSubscription : Sub Msg
@@ -147,6 +167,8 @@ view model =
                     ]
                 ]
             ]
+        , ul [ class "list-group" ] <|
+            List.map viewError model.errors
         , div [ class "row m-2", style "height" "1000px" ]
             [ div
                 [ attribute "id" "display"
@@ -157,3 +179,14 @@ view model =
                 []
             ]
         ]
+
+
+viewError : Data.ServerError -> Html Msg
+viewError error =
+    li
+        [ classList
+            [ ( "list-group-item", True )
+            , ( "list-group-item-danger", True )
+            ]
+        ]
+        [ text error.msg ]
