@@ -16,3 +16,7 @@ systemctl --user enable podman.service
 
 - look at (Qualified Namespaces)[https://github.com/containers/image/blob/main/docs/containers-registries.conf.5.md#note-risk-of-using-unqualified-image-names]
 
+
+
+gunicorn --bind localhost:9000 wsgi:app
+elm-live src/Main.elm --start-page=src/scanner.html --port=9001 -- --output=elm.js
