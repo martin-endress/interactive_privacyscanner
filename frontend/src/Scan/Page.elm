@@ -1,7 +1,7 @@
 port module Scan.Page exposing (..)
 
-import Html exposing (Html, button, div, h2, input, label, li, span, text, ul)
-import Html.Attributes exposing (attribute, class, classList, style)
+import Html exposing (Html, b, button, dd, div, dl, dt, h2, input, label, li, p, span, text, ul)
+import Html.Attributes exposing (attribute, class, classList, disabled, style)
 import Html.Events exposing (onClick, onInput, onMouseEnter, onMouseLeave)
 import Http exposing (Metadata)
 import Http.Detailed exposing (Error)
@@ -134,59 +134,120 @@ view model =
     div
         [ class "container-fluid" ]
         [ h2 [] [ text "Interactive Privacy Scanner" ]
-        , div [ class "row m-2" ]
-            [ div [ class "col-md-6 mx-auto" ]
-                [ label
-                    [ attribute "for" "url_input" ]
-                    [ text "Enter URL to perform an interactive scan:" ]
-                , div [ class "input-group mb-3" ]
-                    [ div [ class "input-group-prepend" ]
-                        [ span
-                            [ class "input-group-text", attribute "id" "basic-addon3" ]
-                            [ text "http://" ]
-                        ]
-                    , input
-                        [ attribute "type" "text"
-                        , class "form-control"
-                        , attribute "id" "url_input"
-                        , attribute
-                            "aria-describedby"
-                            "basic-addon3"
-                        , attribute
-                            "placeholder"
-                            "url, e.g. uni-bamberg.de"
-                        , onInput UpdateUrlInput
-                        ]
-                        [ text model.urlInput ]
-                    , button
-                        [ class "btn btn-primary"
-                        , attribute "type" "button"
-                        , onClick StartScan
-                        ]
-                        [ text "Start Scan" ]
-                    ]
-                ]
-            ]
-        , ul [ class "list-group" ] <|
-            List.map viewError model.errors
+        , viewStartInput model
         , div [ class "row m-2", style "height" "1000px" ]
-            [ div
-                [ attribute "id" "display"
-                , onMouseEnter (SetGuacamoleFocus True)
-                , onMouseLeave (SetGuacamoleFocus False)
-                , class "col"
-                ]
-                []
+            [ viewGuacamoleDisplay
+            , viewStatusPanel model
             ]
+        ]
+
+
+viewStartInput : Model -> Html Msg
+viewStartInput model =
+    div [ class "row m-2" ]
+        [ div [ class "col-md-6 mx-auto" ]
+            [ label
+                [ attribute "for" "url_input" ]
+                [ text "Enter URL to perform an interactive scan:" ]
+            , div [ class "input-group mb-3" ]
+                [ div [ class "input-group-prepend" ]
+                    [ span
+                        [ class "input-group-text", attribute "id" "basic-addon3" ]
+                        [ text "http://" ]
+                    ]
+                , input
+                    [ attribute "type" "text"
+                    , class "form-control"
+                    , attribute "id" "url_input"
+                    , attribute
+                        "aria-describedby"
+                        "basic-addon3"
+                    , attribute
+                        "placeholder"
+                        "url, e.g. uni-bamberg.de"
+                    , onInput UpdateUrlInput
+                    ]
+                    [ text model.urlInput ]
+                , button
+                    [ class "btn btn-primary"
+                    , attribute "type" "button"
+                    , onClick StartScan
+                    ]
+                    [ text "Start Scan" ]
+                ]
+            ]
+        ]
+
+
+viewGuacamoleDisplay : Html Msg
+viewGuacamoleDisplay =
+    div
+        [ attribute "id" "display"
+        , onMouseEnter (SetGuacamoleFocus True)
+        , onMouseLeave (SetGuacamoleFocus False)
+        , class "col"
+        ]
+        []
+
+
+viewStatusPanel : Model -> Html Msg
+viewStatusPanel model =
+    div
+        [ class "col-md-4", class "bg-light" ]
+        [ descriptionList
+            [ ( "Status", Data.statusToString model.status )
+            , ( "Current URL", "" )
+            ]
+        , viewErrors model.errors
+
+        -- progress bar
+        --<div class="row m-1">
+        --    <div class="progress container-fluid">
+        --        <div id="scan_progress" class="progress-bar progress-bar-striped progress-bar-animated"
+        --            role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0"
+        --            aria-valuemax="100"></div>
+        --    </div>
+        --</div>
+        , div
+            [ class "row", class "m-2" ]
+            [ button [ class "btn", class "btn-primary", disabled True ] [ text "Register User Interaction" ]
+            ]
+        , div [ class "row", class "m-2" ]
+            [ button [ class "btn", class "btn-success", disabled True ] [ text "Finish Scan" ]
+            ]
+        ]
+
+
+descriptionList : List ( String, String ) -> Html Msg
+descriptionList items =
+    dl [ class "row", class "m-2" ]
+        (items
+            |> List.map descriptionListItem
+            |> List.concat
+        )
+
+
+descriptionListItem : ( String, String ) -> List (Html Msg)
+descriptionListItem ( k, v ) =
+    [ dt [ class "col-sm-3" ] [ text k ]
+    , dd [ class "col-sm-9" ] [ text v ]
+    ]
+
+
+viewErrors : List ServerError -> Html Msg
+viewErrors serverErrors =
+    div
+        [ class "row", class "m-2" ]
+        [ div [ class "col-sm-3" ] [ b [] [ text "Errors" ] ]
+        , if List.isEmpty serverErrors then
+            div [ class "col-sm-9" ] [ text "no errors :)" ]
+
+          else
+            ul [ class "col", class "list-group" ] <|
+                List.map viewError serverErrors
         ]
 
 
 viewError : Data.ServerError -> Html Msg
 viewError error =
-    li
-        [ classList
-            [ ( "list-group-item", True )
-            , ( "list-group-item-danger", True )
-            ]
-        ]
-        [ text error.msg ]
+    li [ class "list-group-item-danger" ] [ text error.msg ]
