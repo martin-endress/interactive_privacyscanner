@@ -1,4 +1,4 @@
-package org.apache.guacamole.net.example;
+package de.uniba.psi;
 
 import javax.servlet.http.HttpServletRequest;
 import org.apache.guacamole.GuacamoleException;
@@ -10,7 +10,7 @@ import org.apache.guacamole.protocol.ConfiguredGuacamoleSocket;
 import org.apache.guacamole.protocol.GuacamoleConfiguration;
 import org.apache.guacamole.servlet.GuacamoleHTTPTunnelServlet;
 
-public class TutorialGuacamoleTunnelServlet extends GuacamoleHTTPTunnelServlet {
+public class GuacamoleTunnelServlet extends GuacamoleHTTPTunnelServlet {
 
     @Override
     protected GuacamoleTunnel doConnect(HttpServletRequest request) throws GuacamoleException {
@@ -18,8 +18,7 @@ public class TutorialGuacamoleTunnelServlet extends GuacamoleHTTPTunnelServlet {
         GuacamoleConfiguration config = new GuacamoleConfiguration();
         config.setProtocol("vnc");
         config.setParameter("hostname", "localhost");
-        //config.setParameter("port", request.getParameter("port"));
-        config.setParameter("port", "5900");
+        config.setParameter("port", request.getParameter("port"));
         config.setParameter("password", "asdf");
 
         // Connect to guacd - everything is hard-coded here.

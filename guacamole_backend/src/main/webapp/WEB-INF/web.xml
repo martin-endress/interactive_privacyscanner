@@ -6,17 +6,12 @@
     xsi:schemaLocation="http://java.sun.com/xml/ns/javaee 
                         http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd">
 
-    <!-- Basic config -->
-    <welcome-file-list>
-        <welcome-file>index.html</welcome-file>
-    </welcome-file-list>
-
     <!-- Guacamole Tunnel Servlet -->
     <servlet>
         <description>Tunnel servlet.</description>
         <servlet-name>Tunnel</servlet-name>
         <servlet-class>
-            org.apache.guacamole.net.example.TutorialGuacamoleTunnelServlet
+            de.uniba.psi.GuacamoleTunnelServlet
         </servlet-class>
     </servlet>
 
