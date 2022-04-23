@@ -1,0 +1,6 @@
+# todo check if we need podman.service here also
+
+[Unit]
+Description=Interactive Privacyscanner containing a frontend and multiple backend services
+Requires=privacyscanner_manager.service tomcat8.service guacd.service nginx.service
+After=graphical.target
