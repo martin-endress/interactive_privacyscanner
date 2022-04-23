@@ -60,6 +60,7 @@ def start_instance():
     scanner.start()
     scanners[container.id] = scanner
 
+    # TODO fix this ugly way of waiting for the container to be ready!
     time.sleep(2)
 
     # Respond
