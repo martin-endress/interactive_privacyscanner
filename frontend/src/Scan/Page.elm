@@ -1,6 +1,7 @@
 port module Scan.Page exposing (..)
 
-import Html exposing (Html, b, button, dd, div, dl, dt, h2, input, label, li, p, span, text, ul)
+import Bytes exposing (Bytes)
+import Html exposing (Html, b, button, dd, div, dl, dt, h2, input, label, li, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, style)
 import Html.Events exposing (onClick, onInput, onMouseEnter, onMouseLeave)
 import Http exposing (Metadata)
@@ -9,8 +10,13 @@ import Scan.Data as Data exposing (ContainerStartInfo, ScanStatus(..), ServerErr
 import Scan.Requests as Requests
 
 
+
+-- MODEL
+
+
 type alias Model =
     { status : ScanStatus
+    , interactionCount : Int
     , urlInput : String
     , guacamoleFocus : Bool
     , errors : List ServerError
@@ -20,10 +26,12 @@ type alias Model =
 type Msg
     = Empty
     | UpdateUrlInput String
-    | StartScan
-    | ReceiveGuacamoleError String
     | SetGuacamoleFocus Bool
+    | StartScan
     | GotStartResult (Result (Error String) ( Metadata, ContainerStartInfo ))
+    | ReceiveGuacamoleError String
+    | RegisterInteraction
+    | GotRegisterInteraction (Result (Error Bytes) ())
 
 
 
@@ -46,6 +54,7 @@ port messageReceiver : (String -> msg) -> Sub msg
 init : Model
 init =
     { status = Idle
+    , interactionCount = 0
     , urlInput = ""
     , guacamoleFocus = False
     , errors = []
@@ -69,19 +78,20 @@ update msg model =
             , Cmd.none
             )
 
-        StartScan ->
-            let
-                startContainer =
-                    Requests.startContainerInstance GotStartResult model.urlInput
-
-                newModel =
-                    { model
-                        | status = StartingContainer model.urlInput
-                    }
-            in
-            ( newModel
-            , startContainer
+        SetGuacamoleFocus focus ->
+            ( { model | guacamoleFocus = focus }
+            , setGuacamoleFocus focus
             )
+
+        StartScan ->
+            ( { model
+                | status = StartingContainer model.urlInput
+              }
+            , Requests.startContainerInstance GotStartResult model.urlInput
+            )
+
+        GotStartResult result ->
+            processStartResult model result
 
         ReceiveGuacamoleError guacamoleMessage ->
             ( { model
@@ -93,40 +103,72 @@ update msg model =
             , Cmd.none
             )
 
-        SetGuacamoleFocus val ->
-            ( { model | guacamoleFocus = val }
-            , setGuacamoleFocus val
+        RegisterInteraction ->
+            ( model
+            , Requests.registerUserInteraction GotRegisterInteraction ""
             )
 
-        GotStartResult result ->
-            case result of
-                Ok ( _, containerInfo ) ->
-                    let
-                        ( newModel, vncPort ) =
-                            updateStartContainer containerInfo model
-                    in
-                    ( newModel
-                    , connectTunnel vncPort
+        GotRegisterInteraction result ->
+            ( processRegisterInteractionResult result model
+            , Cmd.none
+            )
+
+
+processStartResult : Model -> Result (Error String) ( Metadata, ContainerStartInfo ) -> ( Model, Cmd Msg )
+processStartResult model result =
+    case result of
+        Ok ( _, containerInfo ) ->
+            let
+                ( newModel, vncPort ) =
+                    ( { model | status = Connecting containerInfo }
+                    , containerInfo.vnc_port
                     )
+            in
+            ( newModel
+            , connectTunnel vncPort
+            )
 
-                Err error ->
-                    ( { model
-                        | errors = Data.errorFromResponse error :: model.errors
-                      }
-                    , Cmd.none
-                    )
+        Err error ->
+            ( { model
+                | errors = Data.errorFromStringResponse error :: model.errors
+              }
+            , Cmd.none
+            )
 
 
-updateStartContainer : ContainerStartInfo -> Model -> ( Model, Int )
-updateStartContainer startInfo model =
-    ( { model | status = Connecting startInfo }
-    , startInfo.vnc_port
-    )
+processRegisterInteractionResult : Result (Error Bytes) () -> Model -> Model
+processRegisterInteractionResult result =
+    case result of
+        Ok _ ->
+            updateStatus ScanInProgress
+
+        Err error ->
+            appendError error
+
+
+updateStatus : ScanStatus -> Model -> Model
+updateStatus newStatus model =
+    { model | status = newStatus }
+
+
+appendError : Error a -> Model -> Model
+appendError error model =
+    { model
+        | errors = Data.errorFromResponse error :: model.errors
+    }
+
+
+
+-- SUBSCRIPTIONS
 
 
 messageSubscription : Sub Msg
 messageSubscription =
     messageReceiver ReceiveGuacamoleError
+
+
+
+-- VIEW
 
 
 view : Model -> Html Msg
@@ -136,7 +178,7 @@ view model =
         [ h2 [] [ text "Interactive Privacy Scanner" ]
         , viewStartInput model
         , div [ class "row m-2", style "height" "1000px" ]
-            [ viewGuacamoleDisplay
+            [ viewGuacamoleDisplay model.guacamoleFocus
             , viewStatusPanel model
             ]
         ]
@@ -150,12 +192,7 @@ viewStartInput model =
                 [ attribute "for" "url_input" ]
                 [ text "Enter URL to perform an interactive scan:" ]
             , div [ class "input-group mb-3" ]
-                [ div [ class "input-group-prepend" ]
-                    [ span
-                        [ class "input-group-text", attribute "id" "basic-addon3" ]
-                        [ text "http://" ]
-                    ]
-                , input
+                [ input
                     [ attribute "type" "text"
                     , class "form-control"
                     , attribute "id" "url_input"
@@ -179,13 +216,18 @@ viewStartInput model =
         ]
 
 
-viewGuacamoleDisplay : Html Msg
-viewGuacamoleDisplay =
+viewGuacamoleDisplay : Bool -> Html Msg
+viewGuacamoleDisplay inFocus =
     div
         [ attribute "id" "display"
+        , classList
+            [ ( "col", True )
+            , ( "border", inFocus )
+            , ( "border-success", inFocus )
+            , ( "border-2", inFocus )
+            ]
         , onMouseEnter (SetGuacamoleFocus True)
         , onMouseLeave (SetGuacamoleFocus False)
-        , class "col"
         ]
         []
 
@@ -196,7 +238,8 @@ viewStatusPanel model =
         [ class "col-md-4", class "bg-light" ]
         [ descriptionList
             [ ( "Status", Data.statusToString model.status )
-            , ( "Current URL", "" )
+            , ( "Current URL", "." )
+            , ( "Interactions", String.fromInt model.interactionCount )
             ]
         , viewErrors model.errors
 

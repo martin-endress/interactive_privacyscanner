@@ -1,4 +1,4 @@
-module Scan.Data exposing (ContainerStartInfo, ScanStatus(..), ServerError, errorFromResponse, statusToString)
+module Scan.Data exposing (ContainerStartInfo, ScanStatus(..), ServerError, errorFromResponse, errorFromStringResponse, statusToString)
 
 import Http.Detailed exposing (Error(..))
 import String exposing (fromInt)
@@ -15,8 +15,33 @@ type alias ServerError =
     }
 
 
-errorFromResponse : Error String -> ServerError
+errorFromResponse : Error a -> ServerError
 errorFromResponse err =
+    case err of
+        BadUrl url ->
+            { msg = "Bad input URL: " ++ url }
+
+        Timeout ->
+            { msg = "Server Timeout" }
+
+        NetworkError ->
+            { msg = "Network Error" }
+
+        BadStatus meta _ ->
+            { msg = "Bad Status " ++ fromInt meta.statusCode }
+
+        BadBody meta _ str ->
+            { msg =
+                "Bad Body, parsing not possible: "
+                    ++ str
+                    ++ " (status="
+                    ++ fromInt meta.statusCode
+                    ++ ")"
+            }
+
+
+errorFromStringResponse : Error String -> ServerError
+errorFromStringResponse err =
     case err of
         BadUrl url ->
             { msg = "Bad input URL: " ++ url }
@@ -46,7 +71,8 @@ type ScanStatus
     = Idle
     | StartingContainer String
     | Connecting ContainerStartInfo
-    | GuacamoleConnected
+    | AwaitingInteraction
+    | ScanInProgress
 
 
 statusToString : ScanStatus -> String
@@ -61,5 +87,8 @@ statusToString status =
         Connecting _ ->
             "Connecting to Browser."
 
-        GuacamoleConnected ->
-            "Connection established. You can now interact with the site and initiate a scan."
+        AwaitingInteraction ->
+            "Awaiting user input."
+
+        ScanInProgress ->
+            "Scan in progress, please wait."
