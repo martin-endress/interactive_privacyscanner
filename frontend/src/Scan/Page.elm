@@ -1,12 +1,14 @@
 port module Scan.Page exposing (..)
 
 import Bytes exposing (Bytes)
+import Delay
 import Html exposing (Html, b, button, dd, div, dl, dt, h2, input, label, li, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, style)
 import Html.Events exposing (onClick, onInput, onMouseEnter, onMouseLeave)
 import Http exposing (Metadata)
 import Http.Detailed exposing (Error)
-import Scan.Data as Data exposing (ContainerStartInfo, ScanStatus(..), ServerError)
+import Json.Decode as D
+import Scan.Data as Data exposing (ContainerStartInfo, ScanStatus(..), ScanUpdate, ServerError)
 import Scan.Requests as Requests
 
 
@@ -16,6 +18,7 @@ import Scan.Requests as Requests
 
 type alias Model =
     { status : ScanStatus
+    , vncPort : Maybe Int
     , interactionCount : Int
     , urlInput : String
     , guacamoleFocus : Bool
@@ -29,7 +32,8 @@ type Msg
     | SetGuacamoleFocus Bool
     | StartScan
     | GotStartResult (Result (Error String) ( Metadata, ContainerStartInfo ))
-    | ReceiveGuacamoleError String
+    | ConnectToGuacamole
+    | ReceiveScanUpdate ScanUpdate
     | RegisterInteraction
     | GotRegisterInteraction (Result (Error Bytes) ())
 
@@ -44,7 +48,7 @@ port connectTunnel : Int -> Cmd msg
 port setGuacamoleFocus : Bool -> Cmd msg
 
 
-port messageReceiver : (String -> msg) -> Sub msg
+port messageReceiver : (D.Value -> msg) -> Sub msg
 
 
 
@@ -54,6 +58,7 @@ port messageReceiver : (String -> msg) -> Sub msg
 init : Model
 init =
     { status = Idle
+    , vncPort = Nothing
     , interactionCount = 0
     , urlInput = ""
     , guacamoleFocus = False
@@ -85,21 +90,23 @@ update msg model =
 
         StartScan ->
             ( { model
-                | status = StartingContainer model.urlInput
+                | status = ConnectingToBrowser
               }
-            , Requests.startContainerInstance GotStartResult model.urlInput
+            , Requests.startScan GotStartResult model.urlInput
             )
 
         GotStartResult result ->
             processStartResult model result
 
-        ReceiveGuacamoleError guacamoleMessage ->
-            ( { model
-                | errors =
-                    { msg = guacamoleMessage
-                    }
-                        :: model.errors
-              }
+        ConnectToGuacamole ->
+            ( model
+            , model.vncPort
+                |> Maybe.map connectTunnel
+                |> Maybe.withDefault Cmd.none
+            )
+
+        ReceiveScanUpdate scanUpdate ->
+            ( processScanUpdate scanUpdate model
             , Cmd.none
             )
 
@@ -118,14 +125,11 @@ processStartResult : Model -> Result (Error String) ( Metadata, ContainerStartIn
 processStartResult model result =
     case result of
         Ok ( _, containerInfo ) ->
-            let
-                ( newModel, vncPort ) =
-                    ( { model | status = Connecting containerInfo }
-                    , containerInfo.vnc_port
-                    )
-            in
-            ( newModel
-            , connectTunnel vncPort
+            ( { model
+                | status = InitialScanInProgress
+                , vncPort = Just containerInfo.vnc_port
+              }
+            , Delay.after 3000 ConnectToGuacamole
             )
 
         Err error ->
@@ -134,6 +138,12 @@ processStartResult model result =
               }
             , Cmd.none
             )
+
+
+processScanUpdate : ScanUpdate -> Model -> Model
+processScanUpdate scanUpdate model =
+    -- TODO
+    model
 
 
 processRegisterInteractionResult : Result (Error Bytes) () -> Model -> Model
@@ -164,7 +174,8 @@ appendError error model =
 
 messageSubscription : Sub Msg
 messageSubscription =
-    messageReceiver ReceiveGuacamoleError
+    messageReceiver Data.mapScanUpdated
+        |> Sub.map ReceiveScanUpdate
 
 
 
@@ -234,6 +245,10 @@ viewGuacamoleDisplay inFocus =
 
 viewStatusPanel : Model -> Html Msg
 viewStatusPanel model =
+    let
+        awaitingInteraction =
+            model.status == AwaitingInteraction
+    in
     div
         [ class "col-md-4", class "bg-light" ]
         [ descriptionList
@@ -242,21 +257,22 @@ viewStatusPanel model =
             , ( "Interactions", String.fromInt model.interactionCount )
             ]
         , viewErrors model.errors
-
-        -- progress bar
-        --<div class="row m-1">
-        --    <div class="progress container-fluid">
-        --        <div id="scan_progress" class="progress-bar progress-bar-striped progress-bar-animated"
-        --            role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0"
-        --            aria-valuemax="100"></div>
-        --    </div>
-        --</div>
         , div
             [ class "row", class "m-2" ]
-            [ button [ class "btn", class "btn-primary", disabled True ] [ text "Register User Interaction" ]
+            [ button
+                [ class "btn"
+                , class "btn-primary"
+                , disabled <| not awaitingInteraction
+                ]
+                [ text "Register User Interaction" ]
             ]
         , div [ class "row", class "m-2" ]
-            [ button [ class "btn", class "btn-success", disabled True ] [ text "Finish Scan" ]
+            [ button
+                [ class "btn"
+                , class "btn-success"
+                , disabled <| not awaitingInteraction
+                ]
+                [ text "Finish Scan" ]
             ]
         ]
 

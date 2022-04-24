@@ -1,4 +1,4 @@
-module Scan.Requests exposing (registerUserInteraction, startContainerInstance)
+module Scan.Requests exposing (registerUserInteraction, startScan)
 
 import Bytes exposing (Bytes)
 import Http exposing (Metadata)
@@ -17,10 +17,10 @@ managerApi path =
 -- REQUESTS
 
 
-startContainerInstance : (Result (Error String) ( Metadata, ContainerStartInfo ) -> msg) -> String -> Cmd msg
-startContainerInstance m scanUrl =
+startScan : (Result (Error String) ( Metadata, ContainerStartInfo ) -> msg) -> String -> Cmd msg
+startScan m scanUrl =
     Http.post
-        { url = managerApi "start_instance"
+        { url = managerApi "start_scan"
         , body =
             Http.jsonBody <|
                 E.object

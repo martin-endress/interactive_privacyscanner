@@ -1,6 +1,8 @@
-module Scan.Data exposing (ContainerStartInfo, ScanStatus(..), ServerError, errorFromResponse, errorFromStringResponse, statusToString)
+module Scan.Data exposing (ContainerStartInfo, ScanStatus(..), ScanUpdate(..), ServerError, errorFromResponse, errorFromStringResponse, mapScanUpdated, statusToString)
 
+import Dict exposing (Dict)
 import Http.Detailed exposing (Error(..))
+import Json.Decode as D exposing (Decoder)
 import String exposing (fromInt)
 
 
@@ -69,8 +71,8 @@ errorFromStringResponse err =
 
 type ScanStatus
     = Idle
-    | StartingContainer String
-    | Connecting ContainerStartInfo
+    | ConnectingToBrowser
+    | InitialScanInProgress
     | AwaitingInteraction
     | ScanInProgress
 
@@ -79,16 +81,91 @@ statusToString : ScanStatus -> String
 statusToString status =
     case status of
         Idle ->
-            "No site selected, please select an URL to start a scan."
+            "No site selected, please select an URL."
 
-        StartingContainer url ->
-            "Starting Container for URL" ++ url
+        ConnectingToBrowser ->
+            "Connecting to browser, please wait."
 
-        Connecting _ ->
-            "Connecting to Browser."
+        InitialScanInProgress ->
+            "Initial scan in progress, please wait."
 
         AwaitingInteraction ->
             "Awaiting user input."
 
         ScanInProgress ->
             "Scan in progress, please wait."
+
+
+type ScanUpdate
+    = NoOp
+    | ScanComplete
+    | GuacamoleError String
+    | URLChanged String
+
+
+mapScanUpdated : D.Value -> ScanUpdate
+mapScanUpdated msgJson =
+    case decodeMsg msgJson of
+        Ok stateMsg ->
+            stateMsg
+
+        Err errorMessage ->
+            let
+                _ =
+                    Debug.log "Error in mapScanUpdated:" errorMessage
+            in
+            NoOp
+
+
+decodeMsg : D.Value -> Result D.Error ScanUpdate
+decodeMsg msg =
+    D.decodeValue scanUpdateDecoder msg
+
+
+scanUpdateDecoder : Decoder ScanUpdate
+scanUpdateDecoder =
+    D.string
+        |> D.andThen
+            (\str ->
+                case str of
+                    "ScanComplete" ->
+                        D.succeed ScanComplete
+
+                    somethingElse ->
+                        D.fail <| "Unknown theme: " ++ somethingElse
+            )
+
+
+onlyJusts : Decoder (Maybe a) -> Decoder a
+onlyJusts =
+    D.andThen
+        (\m ->
+            m
+                |> Maybe.map D.succeed
+                |> Maybe.withDefault (D.fail "Decoding failed")
+        )
+
+
+scanUpdateDecoder1 : Decoder ScanUpdate
+scanUpdateDecoder1 =
+    D.keyValuePairs D.string
+        |> D.map List.head
+        |> onlyJusts
+        |> D.map scanUpdateFromDict
+        |> onlyJusts
+
+
+scanUpdateFromDict : ( String, String ) -> Maybe ScanUpdate
+scanUpdateFromDict ( k, v ) =
+    case k of
+        "ScanComplete" ->
+            Just ScanComplete
+
+        "GuacamoleError" ->
+            Just (GuacamoleError v)
+
+        "URLChanged" ->
+            Just (URLChanged v)
+
+        other ->
+            Nothing

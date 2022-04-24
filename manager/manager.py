@@ -31,12 +31,16 @@ def before_request():
     return None
 
 
-@app.route('/start_instance', methods=['POST'])
-def start_instance():
+@app.route('/start_scan', methods=['POST'])
+def start_scan():
     """
+    Starts an interactive scan.
+
     Starts a scanning instance which includes the container and a chrome manager subprocess.
     The subprocess is instructed through a message queue.
+    The initial scan is executed.
     """
+    # Fail fast
     if request.json == None:
         return Response("Request must be a json containing the URL.", status=400)
     url = request.json['url']
@@ -57,28 +61,16 @@ def start_instance():
 
     # Start scanner thread
     scanner = InteractiveScanner(url, container.devtools_port, None)
-    scanner.start()
     scanners[container.id] = scanner
+    scanner.start()
 
-    # TODO fix this ugly way of waiting for the container to be ready!
-    time.sleep(2)
+    # Start initial scan
+    scanner.put_msg(ScannerMessage(MessageType.StartScan, content=''))
 
     # Respond
     response_body = json.dumps(
         {"vnc_port": container.vnc_port, "container_id": container.id})
     return Response(response_body, status=200)
-
-
-@app.route('/start_scan', methods=['POST'])
-def navigate_to_page():
-    logging.info('go to website')
-    try:
-        container_id = get_container_id()
-    except ValueError as e:
-        return Response(str(e), status=400)
-    scanner = scanners[container_id]
-    scanner.put_msg(ScannerMessage(MessageType.StartScan, content=''))
-    return Response(status=200)
 
 
 @app.route('/register_interaction', methods=['POST'])
