@@ -8,7 +8,7 @@ import Html.Events exposing (onClick, onInput, onMouseEnter, onMouseLeave)
 import Http exposing (Metadata)
 import Http.Detailed exposing (Error)
 import Json.Decode as D
-import Scan.Data as Data exposing (ContainerStartInfo, ScanStatus(..), ScanUpdate, ServerError)
+import Scan.Data as Data exposing (ContainerStartInfo, ScanStatus(..), ScanUpdate(..), ServerError)
 import Scan.Requests as Requests
 
 
@@ -18,11 +18,17 @@ import Scan.Requests as Requests
 
 type alias Model =
     { status : ScanStatus
-    , vncPort : Maybe Int
+    , connection : Maybe Connection
     , interactionCount : Int
     , urlInput : String
     , guacamoleFocus : Bool
     , errors : List ServerError
+    }
+
+
+type alias Connection =
+    { vncPort : Int
+    , containerId : String
     }
 
 
@@ -58,7 +64,7 @@ port messageReceiver : (D.Value -> msg) -> Sub msg
 init : Model
 init =
     { status = Idle
-    , vncPort = Nothing
+    , connection = Nothing
     , interactionCount = 0
     , urlInput = ""
     , guacamoleFocus = False
@@ -100,7 +106,8 @@ update msg model =
 
         ConnectToGuacamole ->
             ( model
-            , model.vncPort
+            , model.connection
+                |> Maybe.map .vncPort
                 |> Maybe.map connectTunnel
                 |> Maybe.withDefault Cmd.none
             )
@@ -112,7 +119,10 @@ update msg model =
 
         RegisterInteraction ->
             ( model
-            , Requests.registerUserInteraction GotRegisterInteraction ""
+            , model.connection
+                |> Maybe.map .containerId
+                |> Maybe.map (Requests.registerUserInteraction GotRegisterInteraction)
+                |> Maybe.withDefault Cmd.none
             )
 
         GotRegisterInteraction result ->
@@ -125,9 +135,15 @@ processStartResult : Model -> Result (Error String) ( Metadata, ContainerStartIn
 processStartResult model result =
     case result of
         Ok ( _, containerInfo ) ->
+            let
+                connection =
+                    { vncPort = containerInfo.vnc_port
+                    , containerId = containerInfo.container_id
+                    }
+            in
             ( { model
                 | status = InitialScanInProgress
-                , vncPort = Just containerInfo.vnc_port
+                , connection = Just connection
               }
             , Delay.after 3000 ConnectToGuacamole
             )
@@ -142,8 +158,21 @@ processStartResult model result =
 
 processScanUpdate : ScanUpdate -> Model -> Model
 processScanUpdate scanUpdate model =
-    -- TODO
-    model
+    case scanUpdate of
+        NoOp ->
+            model
+
+        ScanComplete ->
+            updateStatus AwaitingInteraction model
+
+        GuacamoleError message ->
+            { model
+                | errors = { msg = message } :: model.errors
+            }
+
+        URLChanged _ ->
+            -- todo
+            model
 
 
 processRegisterInteractionResult : Result (Error Bytes) () -> Model -> Model
@@ -262,7 +291,9 @@ viewStatusPanel model =
             [ button
                 [ class "btn"
                 , class "btn-primary"
-                , disabled <| not awaitingInteraction
+                , onClick RegisterInteraction
+
+                --, disabled <| not awaitingInteraction
                 ]
                 [ text "Register User Interaction" ]
             ]

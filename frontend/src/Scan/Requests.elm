@@ -19,21 +19,20 @@ managerApi path =
 
 startScan : (Result (Error String) ( Metadata, ContainerStartInfo ) -> msg) -> String -> Cmd msg
 startScan m scanUrl =
+    let
+        resultDecoder =
+            D.map2 ContainerStartInfo
+                (D.field "vnc_port" D.int)
+                (D.field "container_id" D.string)
+    in
     Http.post
         { url = managerApi "start_scan"
         , body =
             Http.jsonBody <|
                 E.object
                     [ ( "url", E.string scanUrl ) ]
-        , expect = expectJson m startContainerResultDecoder
+        , expect = expectJson m resultDecoder
         }
-
-
-startContainerResultDecoder : D.Decoder ContainerStartInfo
-startContainerResultDecoder =
-    D.map2 ContainerStartInfo
-        (D.field "vnc_port" D.int)
-        (D.field "container_id" D.string)
 
 
 registerUserInteraction : (Result (Error Bytes) () -> msg) -> String -> Cmd msg

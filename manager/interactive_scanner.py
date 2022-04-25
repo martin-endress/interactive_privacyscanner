@@ -37,6 +37,9 @@ class InteractiveScanner(Thread):
         init_queue_task = self.event_loop.create_task(self._init_queue())
         self.event_loop.run_until_complete(init_queue_task)
 
+        # Set socket
+        self.client_socket = None
+
         # Init Scanner
         self.url = url
         self.start_url_netloc = urlparse(url).netloc
@@ -52,6 +55,15 @@ class InteractiveScanner(Thread):
 
     async def _init_queue(self):
         self._queue = janus.Queue()
+
+    def set_socket(self, socket):
+        self.client_socket = socket
+
+    def send_socket_msg(self, msg):
+        if self.client_socket == None:
+            return
+        else:
+            self.client_socket.send(msg)
 
     def run(self):
         self.event_loop.run_until_complete(self._start_scanner())
@@ -90,7 +102,8 @@ class InteractiveScanner(Thread):
                 await self._stop_scan(message.content)
                 return True
             case unknown_command:
-                raise ScannerError(f"Unknown command '{unknown_command}' ignored.")
+                raise ScannerError(
+                    f"Unknown command '{unknown_command}' ignored.")
         return False
 
     async def _start_scan(self):
@@ -154,7 +167,8 @@ class InteractiveScanner(Thread):
                 content_type = 'not specified'
                 if 'Content-Type' in entry['headers']:
                     content_type = entry['headers']['Content-Type']
-                third_parties.append({'url': url.netloc, 'Content-Type': content_type})
+                third_parties.append(
+                    {'url': url.netloc, 'Content-Type': content_type})
         return third_parties
 
     async def _register_interaction(self):
@@ -182,7 +196,8 @@ class InteractiveScanner(Thread):
         self.logger.info("Background service Event")
 
     async def _debugger_paused(self, reason, data, **kwargs):
-        self.logger.info("Debugger Paused, reason: %s, data: %s" % (reason, data))
+        self.logger.info("Debugger Paused, reason: %s, data: %s" %
+                         (reason, data))
         await self.target.Debugger.resume()
         self.debugger_paused = True
         if reason == "EventListener":

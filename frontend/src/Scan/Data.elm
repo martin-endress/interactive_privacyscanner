@@ -1,6 +1,5 @@
 module Scan.Data exposing (ContainerStartInfo, ScanStatus(..), ScanUpdate(..), ServerError, errorFromResponse, errorFromStringResponse, mapScanUpdated, statusToString)
 
-import Dict exposing (Dict)
 import Http.Detailed exposing (Error(..))
 import Json.Decode as D exposing (Decoder)
 import String exposing (fromInt)
@@ -124,16 +123,11 @@ decodeMsg msg =
 
 scanUpdateDecoder : Decoder ScanUpdate
 scanUpdateDecoder =
-    D.string
-        |> D.andThen
-            (\str ->
-                case str of
-                    "ScanComplete" ->
-                        D.succeed ScanComplete
-
-                    somethingElse ->
-                        D.fail <| "Unknown theme: " ++ somethingElse
-            )
+    D.keyValuePairs D.string
+        |> D.map List.head
+        |> onlyJusts
+        |> D.map scanUpdateFromDict
+        |> onlyJusts
 
 
 onlyJusts : Decoder (Maybe a) -> Decoder a
@@ -142,17 +136,8 @@ onlyJusts =
         (\m ->
             m
                 |> Maybe.map D.succeed
-                |> Maybe.withDefault (D.fail "Decoding failed")
+                |> Maybe.withDefault (D.fail "Decoding failed, key value pair not valid.")
         )
-
-
-scanUpdateDecoder1 : Decoder ScanUpdate
-scanUpdateDecoder1 =
-    D.keyValuePairs D.string
-        |> D.map List.head
-        |> onlyJusts
-        |> D.map scanUpdateFromDict
-        |> onlyJusts
 
 
 scanUpdateFromDict : ( String, String ) -> Maybe ScanUpdate
@@ -167,5 +152,5 @@ scanUpdateFromDict ( k, v ) =
         "URLChanged" ->
             Just (URLChanged v)
 
-        other ->
+        _ ->
             Nothing

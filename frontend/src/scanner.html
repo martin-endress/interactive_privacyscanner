@@ -28,9 +28,16 @@
         // Add client to display div
         display.appendChild(guac.getDisplay().getElement());
 
+        // Send port messages
+        function sendGuacamoleErrorMsg(msg) {
+            msg_json = { "GuacamoleError": msg }
+            app.ports.messageReceiver.send(msg_json)
+        }
+
         // Send errors to Elm port
         guac.onerror = function (error) {
-            app.ports.messageReceiver.send('guac error (status=' + error.code.toString() + ') - ' + error.message);
+            const error_msg = 'guac error (status=' + error.code.toString() + ') - ' + error.message;
+            sendGuacamoleErrorMsg(error_msg);
         };
 
         // Disconnect on close
@@ -82,13 +89,22 @@
         })
 
         // connect to guacamole
-        app.ports.connectTunnel.subscribe(function (port) {
-            connectGuacamole(port);
+        app.ports.connectTunnel.subscribe(function (connection) {
+            connectGuacamole(connection);
+            connectWebsocket(connection);
         });
 
-        function connectGuacamole(port) {
-            param = "port=" + port.toString()
+        function connectGuacamole(connection) {
+            param = "port=" + connection.port.toString()
             guac.connect(param);
+        }
+
+        function connectWebsocket(connection) {
+            var socket = new WebSocket('ws://');
+            socket.addEventListener("message", function (event) {
+                app.ports.messageReceiver.send(event.data);
+            });
+            socket.send(connection.container_id);
         }
 
         /* ]]> */</script>

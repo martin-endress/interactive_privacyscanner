@@ -77,8 +77,7 @@ def start_scan():
 def register_interaction():
     logging.info('registering interaction')
     try:
-        container_id = get_container_id()
-        scanner = scanners[container_id]
+        scanner = get_scanner()
     except ValueError as e:
         return Response('Client Error: %s' % str(e), status=400)
     scanner.put_msg(ScannerMessage(
@@ -89,8 +88,7 @@ def register_interaction():
 @app.route('/stop_scan', methods=['POST'])
 def stop_scan():
     try:
-        container_id = get_container_id()
-        scanner = scanners[container_id]
+        scanner = get_scanner()
         scanner.put_msg(ScannerMessage(
             MessageType.StopScan, content=container_id))
         return Response('Scan completion initiated.', status=200)
@@ -100,8 +98,20 @@ def stop_scan():
         return Response('Client Error: %s' % str(e), status=400)
 
 
-@app.route('/scan_status', methods=['GET'])
+@sock.route('/addSocket')
+def addSocketConnection(socket):
+    try:
+        scanner = get_scanner()
+        scanner.set_socket(socket)
+        return  # close receiving side
+    except ValueError as e:
+        return Response('Client Error: %s' % str(e), status=400)
+
+
+@app.route('/status', methods=['GET'])
 def status():
+    for s in scanners:
+        s.send_socket_msg('asdf')
     return Response("server up", status=200)
 
 
@@ -121,10 +131,10 @@ def shutdown():
     return Response('Shutdown successful.', status=200)
 
 
-def get_container_id():
+def get_scanner():
     request_body = request.get_json()
     container_id = request_body["container_id"]
     if container_id in scanners:
-        return container_id
+        return scanners[container_id]
     else:
         raise ValueError("Container with id %d does not exist." % container_id)
