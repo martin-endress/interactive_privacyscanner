@@ -101,11 +101,16 @@ def stop_scan():
 @sock.route('/addSocket')
 def addSocketConnection(socket):
     try:
-        scanner = get_scanner()
-        scanner.set_socket(socket)
-        return  # close receiving side
-    except ValueError as e:
-        return Response('Client Error: %s' % str(e), status=400)
+        container_id = socket.receive()
+        if container_id in scanners:
+            scanner = get_scanner()
+            scanner.set_socket(socket)
+            while True:
+                # ignore input for now
+                socket.receive()
+        else:
+            # Close socket.
+            return
 
 
 @app.route('/status', methods=['GET'])

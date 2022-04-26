@@ -100,7 +100,7 @@
         }
 
         function connectWebsocket(connection) {
-            var socket = new WebSocket('ws://');
+            var socket = new WebSocket('ws://scanner.psi.test/manager/addSocket');
             socket.addEventListener("message", function (event) {
                 app.ports.messageReceiver.send(event.data);
             });
