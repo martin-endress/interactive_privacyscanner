@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 
 import janus
 
+import json
 import podman_container
 import result
 import utils
@@ -60,10 +61,13 @@ class InteractiveScanner(Thread):
         self.client_socket = socket
 
     def send_socket_msg(self, msg):
+        msg_json = json.dumps(msg)
         if self.client_socket == None:
+            logger.error('Client socket not set up, ignoring message:' + msg_json)
             return
         else:
-            self.client_socket.send(msg)
+            logger.info('sending message' + msg_json)
+            self.client_socket.send(msg_json)
 
     def run(self):
         self.event_loop.run_until_complete(self._start_scanner())
@@ -118,6 +122,7 @@ class InteractiveScanner(Thread):
         await self._record_information('initial scan')
         # Allow inputs
         await self.target.Input.setIgnoreInputEvents(ignore=False)
+        self.send_socket_msg({"ScanComplete":""})
 
     async def _new_target(self):
         await self.browser.Target.setAutoAttach(

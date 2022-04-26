@@ -1,10 +1,11 @@
 import json
 import logging
-
-from flask import Flask, Response, request
-from podman.errors import PodmanError
 import time
 import logs
+
+from flask import Flask, Response, request
+from flask_sock import Sock
+from podman.errors import PodmanError
 from urllib.parse import urlparse
 from interactive_scanner import InteractiveScanner
 from podman_container import run_container, podman_available, stop_container
@@ -19,6 +20,8 @@ scanners = dict()
 
 # Init flask app
 app = Flask(__name__)
+
+sock = Sock(app)
 
 
 @app.before_request
@@ -99,18 +102,18 @@ def stop_scan():
 
 
 @sock.route('/addSocket')
-def addSocketConnection(socket):
-    try:
-        container_id = socket.receive()
-        if container_id in scanners:
-            scanner = get_scanner()
-            scanner.set_socket(socket)
-            while True:
-                # ignore input for now
-                socket.receive()
-        else:
-            # Close socket.
-            return
+def addSocket(socket):
+    logger.info("socket added")
+    container_id = socket.receive()
+    if container_id in scanners:
+        scanners[container_id].set_socket(socket)
+        while True:
+            # ignore input for now
+            socket.receive()
+    else:
+        # Illegal request, close socket.
+        # todo tell elm
+        return
 
 
 @app.route('/status', methods=['GET'])
@@ -121,7 +124,7 @@ def status():
 
 
 @app.route('/stop_all_scans', methods=['POST'])
-def shutdown():
+def stop_all_scans():
     """
     Used for debugging purposes.
     """

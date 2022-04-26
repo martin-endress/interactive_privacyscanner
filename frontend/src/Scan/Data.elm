@@ -2,6 +2,7 @@ module Scan.Data exposing (ContainerStartInfo, ScanStatus(..), ScanUpdate(..), S
 
 import Http.Detailed exposing (Error(..))
 import Json.Decode as D exposing (Decoder)
+import Json.Encode as E
 import String exposing (fromInt)
 
 
@@ -111,7 +112,7 @@ mapScanUpdated msgJson =
         Err errorMessage ->
             let
                 _ =
-                    Debug.log "Error in mapScanUpdated:" errorMessage
+                    Debug.log "Illegal message detected:" ( errorMessage, E.encode 2 msgJson )
             in
             NoOp
 

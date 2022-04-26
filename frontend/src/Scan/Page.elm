@@ -8,6 +8,7 @@ import Html.Events exposing (onClick, onInput, onMouseEnter, onMouseLeave)
 import Http exposing (Metadata)
 import Http.Detailed exposing (Error)
 import Json.Decode as D
+import Json.Encode as E
 import Scan.Data as Data exposing (ContainerStartInfo, ScanStatus(..), ScanUpdate(..), ServerError)
 import Scan.Requests as Requests
 
@@ -48,7 +49,7 @@ type Msg
 -- PORTS
 
 
-port connectTunnel : Int -> Cmd msg
+port connectTunnel : E.Value -> Cmd msg
 
 
 port setGuacamoleFocus : Bool -> Cmd msg
@@ -105,9 +106,16 @@ update msg model =
             processStartResult model result
 
         ConnectToGuacamole ->
+            let
+                encodeConnection connection =
+                    E.object
+                        [ ( "vncPort", E.int connection.vncPort )
+                        , ( "containerId", E.string connection.containerId )
+                        ]
+            in
             ( model
             , model.connection
-                |> Maybe.map .vncPort
+                |> Maybe.map encodeConnection
                 |> Maybe.map connectTunnel
                 |> Maybe.withDefault Cmd.none
             )

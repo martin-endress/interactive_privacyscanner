@@ -95,16 +95,30 @@
         });
 
         function connectGuacamole(connection) {
-            param = "port=" + connection.port.toString()
+            param = "port=" + connection.vncPort.toString()
             guac.connect(param);
         }
 
+        // Init Websocket
+        const socket = new WebSocket('ws://localhost:9000/addSocket');
+
         function connectWebsocket(connection) {
-            var socket = new WebSocket('ws://scanner.psi.test/manager/addSocket');
-            socket.addEventListener("message", function (event) {
-                app.ports.messageReceiver.send(event.data);
-            });
-            socket.send(connection.container_id);
+            if (socket.readyState === 1) {
+                socket.send(connection.containerId);
+                socket.addEventListener("message", function (event) {
+                    try {
+                        app.ports.messageReceiver.send(JSON.parse(event.data));
+                    } catch (SyntaxError) {
+                        app.ports.messageReceiver.send({ "GuacamoleError": "SYNTAX ERROR IN SERVER MESSAGE" })
+                    }
+                });
+            } else {
+                msg_json = { "GuacamoleError": "WEBSOCKET NOT UP" }
+                // TODO tell elm
+            }
+            //socket.addEventListener("close", function (event) {
+            //    // todo tell elm
+            //})
         }
 
         /* ]]> */</script>
