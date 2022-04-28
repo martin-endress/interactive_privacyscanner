@@ -2,7 +2,7 @@ import asyncio
 import string
 from contextlib import suppress
 from pathlib import Path
-
+import base64
 
 class DirectoryFileHandler:
     def __init__(self, result_dir):
@@ -16,6 +16,11 @@ class DirectoryFileHandler:
         output_dir = self._debug_files_dir if debug else self._files_dir
         with (output_dir / filename).open('wb') as f:
             f.write(contents)
+
+    def add_image(self, filename, contents, debug):
+        output_dir = self._files_dir
+        with (self._files_dir / filename).open("wb") as f:
+            f.write(base64.urlsafe_b64decode(contents))
 
 
 class NoOpFileHandler:

@@ -1,4 +1,4 @@
-module Scan.Requests exposing (registerUserInteraction, startScan)
+module Scan.Requests exposing (clearBrowserCookies, finishScan, registerUserInteraction, startScan, takeScreenshot)
 
 import Bytes exposing (Bytes)
 import Http exposing (Metadata)
@@ -39,6 +39,42 @@ registerUserInteraction : (Result (Error Bytes) () -> msg) -> String -> Cmd msg
 registerUserInteraction m containerId =
     Http.post
         { url = managerApi "register_interaction"
+        , body =
+            Http.jsonBody <|
+                E.object
+                    [ ( "container_id", E.string containerId ) ]
+        , expect = expectWhatever m
+        }
+
+
+finishScan : (Result (Error Bytes) () -> msg) -> String -> Cmd msg
+finishScan m containerId =
+    Http.post
+        { url = managerApi "stop_scan"
+        , body =
+            Http.jsonBody <|
+                E.object
+                    [ ( "container_id", E.string containerId ) ]
+        , expect = expectWhatever m
+        }
+
+
+clearBrowserCookies : (Result (Error Bytes) () -> msg) -> String -> Cmd msg
+clearBrowserCookies m containerId =
+    Http.post
+        { url = managerApi "clear_cookies"
+        , body =
+            Http.jsonBody <|
+                E.object
+                    [ ( "container_id", E.string containerId ) ]
+        , expect = expectWhatever m
+        }
+
+
+takeScreenshot : (Result (Error Bytes) () -> msg) -> String -> Cmd msg
+takeScreenshot m containerId =
+    Http.post
+        { url = managerApi "take_screenshot"
         , body =
             Http.jsonBody <|
                 E.object

@@ -17,15 +17,13 @@
         // Init ELM
         var app = Elm.Main.init({ node: document.getElementById("container") });
 
-        // Get display div from document
-        var display = document.getElementById("display");
-
         // Instantiate client, using an HTTP tunnel for communications.
         var guac = new Guacamole.Client(
             new Guacamole.HTTPTunnel("http://scanner.psi.test/guac/guacamole-backend-1.0/tunnel")
         );
 
         // Add client to display div
+        var display = document.getElementById("display");
         display.appendChild(guac.getDisplay().getElement());
 
         // Send port messages
@@ -47,8 +45,8 @@
         }
 
         // Mouse and keyboard events on focus / unfocus
-        var mouse = new Guacamole.Mouse(guac.getDisplay().getElement());
-        var keyboard = new Guacamole.Keyboard(document);
+        const mouse = new Guacamole.Mouse(guac.getDisplay().getElement());
+        const keyboard = new Guacamole.Keyboard(document);
 
         // Focus guacamole element including key and mouse events
         function focusGuacamole() {
@@ -102,24 +100,33 @@
         // Init Websocket
         const socket = new WebSocket('ws://localhost:9000/addSocket');
 
+        // Event listeners
+        socket.addEventListener("message", function (event) {
+            try {
+                app.ports.messageReceiver.send(JSON.parse(event.data));
+            } catch (SyntaxError) {
+                msg_json = { "SocketError": "Syntax error in socket message from server." }
+                app.ports.messageReceiver.send(msg_json)
+            }
+        });
+        socket.addEventListener("close", function (event) {
+            msg_json = { "SocketError": "Websocket closed." }
+            app.ports.messageReceiver.send(msg_json)
+        })
+
         function connectWebsocket(connection) {
             if (socket.readyState === 1) {
                 socket.send(connection.containerId);
-                socket.addEventListener("message", function (event) {
-                    try {
-                        app.ports.messageReceiver.send(JSON.parse(event.data));
-                    } catch (SyntaxError) {
-                        app.ports.messageReceiver.send({ "GuacamoleError": "SYNTAX ERROR IN SERVER MESSAGE" })
-                    }
-                });
             } else {
-                msg_json = { "GuacamoleError": "WEBSOCKET NOT UP" }
-                // TODO tell elm
+                msg_json = { "SocketError": "Websocket not available, ignoring all messages." }
+                app.ports.messageReceiver.send(msg_json)
             }
-            //socket.addEventListener("close", function (event) {
-            //    // todo tell elm
-            //})
         }
+
+        // disconnect from guacamole
+        app.ports.disconnectTunnel.subscribe(function () {
+            guac.disconnect();
+        });
 
         /* ]]> */</script>
 

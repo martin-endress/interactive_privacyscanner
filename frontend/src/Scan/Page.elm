@@ -9,7 +9,7 @@ import Http exposing (Metadata)
 import Http.Detailed exposing (Error)
 import Json.Decode as D
 import Json.Encode as E
-import Scan.Data as Data exposing (ContainerStartInfo, ScanStatus(..), ScanUpdate(..), ServerError)
+import Scan.Data as Data exposing (ContainerStartInfo, ScanState(..), ScanUpdate(..), ServerError, scanUpdateToString)
 import Scan.Requests as Requests
 
 
@@ -18,12 +18,14 @@ import Scan.Requests as Requests
 
 
 type alias Model =
-    { status : ScanStatus
+    { scanState : ScanState
     , connection : Maybe Connection
     , interactionCount : Int
     , urlInput : String
+    , currentUrl : String
     , guacamoleFocus : Bool
     , errors : List ServerError
+    , log : List String
     }
 
 
@@ -38,11 +40,14 @@ type Msg
     | UpdateUrlInput String
     | SetGuacamoleFocus Bool
     | StartScan
-    | GotStartResult (Result (Error String) ( Metadata, ContainerStartInfo ))
+    | GotStartScan (Result (Error String) ( Metadata, ContainerStartInfo ))
     | ConnectToGuacamole
     | ReceiveScanUpdate ScanUpdate
     | RegisterInteraction
-    | GotRegisterInteraction (Result (Error Bytes) ())
+    | GotRequestResult (Maybe ScanState) (Result (Error Bytes) ())
+    | FinishScan
+    | TakeScreenshot
+    | ClearBrowserCookies
 
 
 
@@ -50,6 +55,9 @@ type Msg
 
 
 port connectTunnel : E.Value -> Cmd msg
+
+
+port disconnectTunnel : () -> Cmd msg
 
 
 port setGuacamoleFocus : Bool -> Cmd msg
@@ -64,12 +72,14 @@ port messageReceiver : (D.Value -> msg) -> Sub msg
 
 init : Model
 init =
-    { status = Idle
+    { scanState = Idle
     , connection = Nothing
     , interactionCount = 0
+    , currentUrl = ""
     , urlInput = ""
     , guacamoleFocus = False
     , errors = []
+    , log = []
     }
 
 
@@ -96,13 +106,11 @@ update msg model =
             )
 
         StartScan ->
-            ( { model
-                | status = ConnectingToBrowser
-              }
-            , Requests.startScan GotStartResult model.urlInput
+            ( updateScanState ConnectingToBrowser model
+            , Requests.startScan GotStartScan model.urlInput
             )
 
-        GotStartResult result ->
+        GotStartScan result ->
             processStartResult model result
 
         ConnectToGuacamole ->
@@ -129,14 +137,47 @@ update msg model =
             ( model
             , model.connection
                 |> Maybe.map .containerId
-                |> Maybe.map (Requests.registerUserInteraction GotRegisterInteraction)
+                |> Maybe.map (Requests.registerUserInteraction <| GotRequestResult (Just ScanInProgress))
                 |> Maybe.withDefault Cmd.none
             )
 
-        GotRegisterInteraction result ->
-            ( processRegisterInteractionResult result model
+        GotRequestResult newScanState result ->
+            ( processRequestResult result newScanState model
             , Cmd.none
             )
+
+        FinishScan ->
+            ( model
+            , finishScanCommands model
+            )
+
+        TakeScreenshot ->
+            ( model
+            , model.connection
+                |> Maybe.map .containerId
+                |> Maybe.map (Requests.takeScreenshot <| GotRequestResult Nothing)
+                |> Maybe.withDefault Cmd.none
+            )
+
+        ClearBrowserCookies ->
+            ( model
+            , model.connection
+                |> Maybe.map .containerId
+                |> Maybe.map (Requests.clearBrowserCookies <| GotRequestResult Nothing)
+                |> Maybe.withDefault Cmd.none
+            )
+
+
+finishScanCommands : Model -> Cmd Msg
+finishScanCommands model =
+    let
+        finishCmd =
+            model.connection
+                |> Maybe.map .containerId
+                |> Maybe.map (Requests.finishScan <| GotRequestResult (Just FinalScanInProgress))
+                |> Maybe.withDefault Cmd.none
+    in
+    Cmd.batch [ finishCmd, disconnectTunnel () ]
 
 
 processStartResult : Model -> Result (Error String) ( Metadata, ContainerStartInfo ) -> ( Model, Cmd Msg )
@@ -149,10 +190,10 @@ processStartResult model result =
                     , containerId = containerInfo.container_id
                     }
             in
-            ( { model
-                | status = InitialScanInProgress
-                , connection = Just connection
-              }
+            ( updateScanState ScanInProgress
+                { model
+                    | connection = Just connection
+                }
             , Delay.after 3000 ConnectToGuacamole
             )
 
@@ -166,43 +207,72 @@ processStartResult model result =
 
 processScanUpdate : ScanUpdate -> Model -> Model
 processScanUpdate scanUpdate model =
-    case scanUpdate of
-        NoOp ->
+    case ( scanUpdate, model.scanState ) of
+        ( NoOp, _ ) ->
             model
 
-        ScanComplete ->
-            updateStatus AwaitingInteraction model
+        ( ScanComplete, ScanInProgress ) ->
+            updateScanState AwaitingInteraction { model | interactionCount = model.interactionCount + 1 }
 
-        GuacamoleError message ->
-            { model
-                | errors = { msg = message } :: model.errors
-            }
+        ( ScanComplete, FinalScanInProgress ) ->
+            init
 
-        URLChanged _ ->
+        ( SocketError message, _ ) ->
+            appendError { msg = "VNC error:" ++ message } model
+
+        ( GuacamoleError message, _ ) ->
+            appendError { msg = "Guacamole error:" ++ message } model
+
+        ( Log message, _ ) ->
+            appendLog message model
+
+        ( URLChanged newUrl, _ ) ->
             -- todo
-            model
+            { model | currentUrl = newUrl }
+
+        ( _, _ ) ->
+            -- Illegal state
+            appendError
+                { msg =
+                    "Illegal State. (msg="
+                        ++ scanUpdateToString scanUpdate
+                        ++ ", state="
+                        ++ Data.stateToString model.scanState
+                        ++ ")"
+                }
+                model
 
 
-processRegisterInteractionResult : Result (Error Bytes) () -> Model -> Model
-processRegisterInteractionResult result =
+processRequestResult : Result (Error Bytes) () -> Maybe ScanState -> Model -> Model
+processRequestResult result newScanState =
     case result of
         Ok _ ->
-            updateStatus ScanInProgress
+            case newScanState of
+                Just state ->
+                    updateScanState state
+
+                Nothing ->
+                    identity
 
         Err error ->
-            appendError error
+            appendError (Data.errorFromResponse error)
 
 
-updateStatus : ScanStatus -> Model -> Model
-updateStatus newStatus model =
-    { model | status = newStatus }
+updateScanState : ScanState -> Model -> Model
+updateScanState newState model =
+    { model | scanState = newState }
 
 
-appendError : Error a -> Model -> Model
-appendError error model =
+appendError : ServerError -> Model -> Model
+appendError err model =
     { model
-        | errors = Data.errorFromResponse error :: model.errors
+        | errors = err :: model.errors
     }
+
+
+appendLog : String -> Model -> Model
+appendLog msg model =
+    { model | log = msg :: model.log }
 
 
 
@@ -226,7 +296,7 @@ view model =
         [ h2 [] [ text "Interactive Privacy Scanner" ]
         , viewStartInput model
         , div [ class "row m-2", style "height" "1000px" ]
-            [ viewGuacamoleDisplay model.guacamoleFocus
+            [ viewGuacamoleDisplay model
             , viewStatusPanel model
             ]
         ]
@@ -264,16 +334,25 @@ viewStartInput model =
         ]
 
 
-viewGuacamoleDisplay : Bool -> Html Msg
-viewGuacamoleDisplay inFocus =
+viewGuacamoleDisplay : Model -> Html Msg
+viewGuacamoleDisplay model =
+    let
+        visibility =
+            if model.scanState == Idle then
+                "hidden"
+
+            else
+                "visible"
+    in
     div
         [ attribute "id" "display"
         , classList
             [ ( "col", True )
-            , ( "border", inFocus )
-            , ( "border-success", inFocus )
-            , ( "border-2", inFocus )
+            , ( "border", model.guacamoleFocus )
+            , ( "border-success", model.guacamoleFocus )
+            , ( "border-2", model.guacamoleFocus )
             ]
+        , style "visibility" visibility
         , onMouseEnter (SetGuacamoleFocus True)
         , onMouseLeave (SetGuacamoleFocus False)
         ]
@@ -284,24 +363,44 @@ viewStatusPanel : Model -> Html Msg
 viewStatusPanel model =
     let
         awaitingInteraction =
-            model.status == AwaitingInteraction
+            model.scanState == AwaitingInteraction
     in
     div
         [ class "col-md-4", class "bg-light" ]
         [ descriptionList
-            [ ( "Status", Data.statusToString model.status )
-            , ( "Current URL", "." )
+            [ ( "Status", Data.stateToString model.scanState )
+            , ( "Current URL", model.currentUrl )
             , ( "Interactions", String.fromInt model.interactionCount )
             ]
         , viewErrors model.errors
+        , viewLogs model.log
+        , div [ class "row", class "m-2" ]
+            [ button
+                [ class "btn"
+                , class "btn-secondary"
+                , class "col-sm"
+                , class "mx-1"
+                , onClick TakeScreenshot
+                , disabled <| not awaitingInteraction
+                ]
+                [ text "Take Screenshot" ]
+            , button
+                [ class "btn"
+                , class "btn-secondary"
+                , class "col-sm"
+                , class "mx-1"
+                , onClick ClearBrowserCookies
+                , disabled <| not awaitingInteraction
+                ]
+                [ text "Clear Cookies" ]
+            ]
         , div
             [ class "row", class "m-2" ]
             [ button
                 [ class "btn"
                 , class "btn-primary"
                 , onClick RegisterInteraction
-
-                --, disabled <| not awaitingInteraction
+                , disabled <| not awaitingInteraction
                 ]
                 [ text "Register User Interaction" ]
             ]
@@ -309,6 +408,7 @@ viewStatusPanel model =
             [ button
                 [ class "btn"
                 , class "btn-success"
+                , onClick FinishScan
                 , disabled <| not awaitingInteraction
                 ]
                 [ text "Finish Scan" ]
@@ -334,6 +434,10 @@ descriptionListItem ( k, v ) =
 
 viewErrors : List ServerError -> Html Msg
 viewErrors serverErrors =
+    let
+        viewErrorEntry e =
+            li [ class "list-group-item-danger" ] [ text e.msg ]
+    in
     div
         [ class "row", class "m-2" ]
         [ div [ class "col-sm-3" ] [ b [] [ text "Errors" ] ]
@@ -342,10 +446,23 @@ viewErrors serverErrors =
 
           else
             ul [ class "col", class "list-group" ] <|
-                List.map viewError serverErrors
+                List.map viewErrorEntry serverErrors
         ]
 
 
-viewError : Data.ServerError -> Html Msg
-viewError error =
-    li [ class "list-group-item-danger" ] [ text error.msg ]
+viewLogs : List String -> Html Msg
+viewLogs log =
+    let
+        viewLogEntry e =
+            li [ class "list-group-item-info" ] [ text e ]
+    in
+    div
+        [ class "row", class "m-2" ]
+        [ div [ class "col-sm-3" ] [ b [] [ text "Log" ] ]
+        , if List.isEmpty log then
+            text ""
+
+          else
+            ul [ class "col", class "list-group" ] <|
+                List.map viewLogEntry log
+        ]

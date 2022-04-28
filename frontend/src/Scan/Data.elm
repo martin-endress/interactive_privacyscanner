@@ -1,4 +1,4 @@
-module Scan.Data exposing (ContainerStartInfo, ScanStatus(..), ScanUpdate(..), ServerError, errorFromResponse, errorFromStringResponse, mapScanUpdated, statusToString)
+module Scan.Data exposing (ContainerStartInfo, ScanState(..), ScanUpdate(..), ServerError, errorFromResponse, errorFromStringResponse, mapScanUpdated, scanUpdateToString, stateToString)
 
 import Http.Detailed exposing (Error(..))
 import Json.Decode as D exposing (Decoder)
@@ -69,16 +69,16 @@ errorFromStringResponse err =
             }
 
 
-type ScanStatus
+type ScanState
     = Idle
     | ConnectingToBrowser
-    | InitialScanInProgress
-    | AwaitingInteraction
     | ScanInProgress
+    | AwaitingInteraction
+    | FinalScanInProgress
 
 
-statusToString : ScanStatus -> String
-statusToString status =
+stateToString : ScanState -> String
+stateToString status =
     case status of
         Idle ->
             "No site selected, please select an URL."
@@ -86,21 +86,45 @@ statusToString status =
         ConnectingToBrowser ->
             "Connecting to browser, please wait."
 
-        InitialScanInProgress ->
-            "Initial scan in progress, please wait."
+        ScanInProgress ->
+            "Scan in progress, please wait."
 
         AwaitingInteraction ->
             "Awaiting user input."
 
-        ScanInProgress ->
-            "Scan in progress, please wait."
+        FinalScanInProgress ->
+            "Final Scan in progress."
 
 
 type ScanUpdate
     = NoOp
     | ScanComplete
+    | SocketError String
+    | Log String
     | GuacamoleError String
     | URLChanged String
+
+
+scanUpdateToString : ScanUpdate -> String
+scanUpdateToString update =
+    case update of
+        NoOp ->
+            "NoOp"
+
+        ScanComplete ->
+            "ScanComplete"
+
+        SocketError _ ->
+            "SocketError"
+
+        Log _ ->
+            "Log"
+
+        GuacamoleError _ ->
+            "GuacamoleError"
+
+        URLChanged _ ->
+            "URLChanged"
 
 
 mapScanUpdated : D.Value -> ScanUpdate
@@ -152,6 +176,9 @@ scanUpdateFromDict ( k, v ) =
 
         "URLChanged" ->
             Just (URLChanged v)
+
+        "Log" ->
+            Just (Log v)
 
         _ ->
             Nothing

@@ -63,7 +63,7 @@ def start_scan():
         return Response(msg, status=503)
 
     # Start scanner thread
-    scanner = InteractiveScanner(url, container.devtools_port, None)
+    scanner = InteractiveScanner(url, container.devtools_port, container.id, None)
     scanners[container.id] = scanner
     scanner.start()
 
@@ -92,28 +92,44 @@ def register_interaction():
 def stop_scan():
     try:
         scanner = get_scanner()
-        scanner.put_msg(ScannerMessage(
-            MessageType.StopScan, content=container_id))
+        scanner.put_msg(ScannerMessage(MessageType.StopScan, content=''))
         return Response('Scan completion initiated.', status=200)
     except PodmanError as e:
         return Response('Server Error: %s' % str(e), status=500)
     except ValueError as e:
         return Response('Client Error: %s' % str(e), status=400)
 
+@app.route('/clear_cookies', methods=['POST'])
+def clear_cookies():
+    try:
+        scanner = get_scanner()
+        scanner.put_msg(ScannerMessage(MessageType.ClearCookies, content=''))
+        return Response('Cookies deleted.', status=200)
+    except PodmanError as e:
+        return Response('Server Error: %s' % str(e), status=500)
+    except ValueError as e:
+        return Response('Client Error: %s' % str(e), status=400)
+
+
+@app.route('/take_screenshot', methods=['POST'])
+def take_screenshot():
+    try:
+        scanner = get_scanner()
+        scanner.put_msg(ScannerMessage(MessageType.TakeScreenshot, content=''))
+        return Response('Screenshot saved.', status=200)
+    except PodmanError as e:
+        return Response('Server Error: %s' % str(e), status=500)
+    except ValueError as e:
+        return Response('Client Error: %s' % str(e), status=400)
 
 @sock.route('/addSocket')
 def addSocket(socket):
-    logger.info("socket added")
-    container_id = socket.receive()
-    if container_id in scanners:
-        scanners[container_id].set_socket(socket)
-        while True:
-            # ignore input for now
-            socket.receive()
-    else:
-        # Illegal request, close socket.
-        # todo tell elm
-        return
+    logger.info("Socket added. Waiting for container id.")
+    while True:
+        container_id = socket.receive()
+        if container_id in scanners:
+            scanners[container_id].set_socket(socket)
+            logger.info("Scanner updated successfully.")
 
 
 @app.route('/status', methods=['GET'])

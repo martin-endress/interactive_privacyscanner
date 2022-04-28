@@ -14,3 +14,5 @@ class MessageType(Enum):
     StartScan = auto()
     RegisterInteraction = auto()
     StopScan = auto()
+    ClearCookies = auto()
+    TakeScreenshot = auto()

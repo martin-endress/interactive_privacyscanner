@@ -27,6 +27,9 @@ class Result(object):
         self._file_handler.add_file(
             filename, self._get_file_contents(filename, contents), debug=False)
 
+    def add_image(self, filename, contents):
+        self._file_handler.add_image(filename, contents, debug=False)
+
     def _get_file_contents(self, filename, contents=None):
         if contents is None:
             with open(filename, 'rb') as f:

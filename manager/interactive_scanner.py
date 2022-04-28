@@ -3,7 +3,7 @@ import logging
 import random
 from threading import Thread
 from urllib.parse import urlparse
-
+import time
 import janus
 
 import json
@@ -27,7 +27,7 @@ class UserInteraction:
 
 
 class InteractiveScanner(Thread):
-    def __init__(self, url, debugging_port, options):
+    def __init__(self, url, debugging_port, container_id, options):
         super().__init__()
         # Mark this thread as daemon
         self.daemon = True
@@ -46,6 +46,7 @@ class InteractiveScanner(Thread):
         self.start_url_netloc = urlparse(url).netloc
         self.options = options
         self.debugging_port = debugging_port
+        self.container_id = container_id
         self.result = result.init_from_scanner(url)
         self._extractors = []
         self._page_loaded = asyncio.Event()
@@ -102,8 +103,12 @@ class InteractiveScanner(Thread):
                 await self._start_scan()
             case ScannerMessage(message_type=MessageType.RegisterInteraction):
                 await self._register_interaction()
+            case ScannerMessage(message_type=MessageType.ClearCookies):
+                await self._clear_cookies()
+            case ScannerMessage(message_type=MessageType.TakeScreenshot):
+                await self._take_screenshot()
             case ScannerMessage(message_type=MessageType.StopScan):
-                await self._stop_scan(message.content)
+                await self._stop_scan()
                 return True
             case unknown_command:
                 raise ScannerError(
@@ -163,6 +168,7 @@ class InteractiveScanner(Thread):
         intermediate_result['third parties'] = self.list_third_parties()
         self._response_log.clear()
         self.result["interaction"].append(intermediate_result.copy())
+        time.sleep(2)
 
     def list_third_parties(self):
         third_parties = list()
@@ -180,15 +186,30 @@ class InteractiveScanner(Thread):
         await self.target.Input.setIgnoreInputEvents(ignore=True)
         await self._record_information('manual interaction')
         await self.target.Input.setIgnoreInputEvents(ignore=False)
+        self.send_socket_msg({"ScanComplete":""})
 
-    async def _stop_scan(self, container_id):
+    async def _stop_scan(self):
         await self.target.Input.setIgnoreInputEvents(ignore=True)
         await self._record_information('end scan')
         self.result.store_result()
-        podman_container.stop_container(container_id)
+        podman_container.stop_container(self.container_id)
+        self.send_socket_msg({"ScanComplete":""})
 
     async def _set_page_loaded(self, **kwargs):
         self._page_loaded.set()
+
+    async def _set_frame_navigated(self, frame, **kwargs):
+        if frame['url'] != 'about:blank':
+            self.send_socket_msg({"URLChanged": frame['url']})
+
+    async def _clear_cookies(self):
+        await self.target.Network.clearBrowserCookies()
+        self.send_socket_msg({"Log": "Cookies deleted"})
+    
+    async def _take_screenshot(self):
+        screenshot = await self.target.Page.captureScreenshot()
+        self.result.add_image('screenshot_interaction.png', screenshot['data'])
+        self.send_socket_msg({"Log": "Screenshot saved"})
 
     async def _set_request_will_be_sent(self, **kwargs):
         self._user_interaction_reason = "request_will_be_sent"
@@ -247,6 +268,7 @@ class InteractiveScanner(Thread):
         # Enable callbacks
         self.target.register_event(
             "Network.loadingFinished", self._set_page_loaded)
+        self.target.register_event("Page.frameNavigated", self._set_frame_navigated)
         self.target.register_event(
             "Network.requestWillBeSent", self._set_request_will_be_sent)
         self.target.register_event(
