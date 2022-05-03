@@ -17,8 +17,8 @@ COPY extra/privacyscanner_proxy.service /etc/systemd/system/privacyscanner_proxy
 COPY extra/start.sh /home/chrome/start.sh
 
 # Config chrome
-RUN mkdir -p "/home/chrome/chrome-profile/Default"
-COPY extra/Preferences /home/chrome/chrome-profile/Default/Preferences
+RUN mkdir -p "/home/chrome/.config/chromium/Default"
+COPY extra/Preferences /home/chrome/.config/chromium/Default/Preferences
 
 # Config VNC
 RUN mkdir "/home/chrome/.vnc"

@@ -18,5 +18,17 @@
     "startup_urls": [
       "about:blank"
     ]
+  },
+  "browser": {
+    "window_placement": {
+      "bottom": 900,
+      "left": 0,
+      "right": 1280,
+      "top": 0,
+      "work_area_bottom": 900,
+      "work_area_left": 0,
+      "work_area_right": 1280,
+      "work_area_top": 0
+    }
   }
 }
