@@ -2,15 +2,17 @@ port module Scan.Page exposing (..)
 
 import Bytes exposing (Bytes)
 import Delay
-import Html exposing (Html, b, button, dd, div, dl, dt, h2, input, label, li, text, ul)
+import Html exposing (Html, b, button, dd, div, dl, dt, h2, h4, input, label, li, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, style)
 import Html.Events exposing (onClick, onInput, onMouseEnter, onMouseLeave)
 import Http exposing (Metadata)
 import Http.Detailed exposing (Error)
 import Json.Decode as D
 import Json.Encode as E
-import Scan.Data as Data exposing (ContainerStartInfo, ScanState(..), ScanUpdate(..), ServerError, scanUpdateToString)
+import Maybe exposing (withDefault)
+import Scan.Data as Data exposing (ContainerStartInfo, LogEntry, ScanState(..), ScanUpdate(..), scanUpdateToString)
 import Scan.Requests as Requests
+import Scan.View as View
 
 
 
@@ -24,8 +26,7 @@ type alias Model =
     , urlInput : String
     , currentUrl : String
     , guacamoleFocus : Bool
-    , errors : List ServerError
-    , log : List String
+    , log : List LogEntry
     }
 
 
@@ -78,9 +79,21 @@ init =
     , currentUrl = ""
     , urlInput = ""
     , guacamoleFocus = False
-    , errors = []
-    , log = []
+    , log = sampleLog
     }
+
+
+sampleLog =
+    [ { msg = "Info log message", level = Data.Info }
+    , { msg = "Warning log message", level = Data.Warning }
+    , { msg = "Error log message", level = Data.Error }
+    , { msg = "asdfLong message:  Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus mollis venenatis augue vehicula tristique. Integer felis ante, consectetur id mi eu, efficitur luctus lorem. Quisque risus lorem, vulputate eu imperdiet sed, tincidunt commodo justo. Cras tincidunt lacus ligula, pretium sollicitudin tortor congue a. Phasellus id convallis leo. Vivamus quis tincidunt lectus. Pellentesque commodo, urna sit amet vulputate fringilla, risus lacus vulputate odio, eget aliquet mauris diam eu metus. Vivamus auctor sit amet justo eu placerat. Donec mi diam, egestas ac mi et, pharetra convallis lectus. Nulla ultrices libero id leo blandit, nec luctus magna feugiat. "
+      , level = Data.Error
+      }
+    , { msg = "asdfLong message:  Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus mollis venenatis augue vehicula tristique. Integer felis ante, consectetur id mi eu, efficitur luctus lorem. Quisque risus lorem, vulputate eu imperdiet sed, tincidunt commodo justo. Cras tincidunt lacus ligula, pretium sollicitudin tortor congue a. Phasellus id convallis leo. Vivamus quis tincidunt lectus. Pellentesque commodo, urna sit amet vulputate fringilla, risus lacus vulputate odio, eget aliquet mauris diam eu metus. Vivamus auctor sit amet justo eu placerat. Donec mi diam, egestas ac mi et, pharetra convallis lectus. Nulla ultrices libero id leo blandit, nec luctus magna feugiat "
+      , level = Data.Error
+      }
+    ]
 
 
 
@@ -199,7 +212,7 @@ processStartResult model result =
 
         Err error ->
             ( { model
-                | errors = Data.errorFromStringResponse error :: model.errors
+                | log = Data.errorFromStringResponse error :: model.log
               }
             , Cmd.none
             )
@@ -212,19 +225,29 @@ processScanUpdate scanUpdate model =
             model
 
         ( ScanComplete, ScanInProgress ) ->
-            updateScanState AwaitingInteraction { model | interactionCount = model.interactionCount + 1 }
+            updateScanState
+                AwaitingInteraction
+                { model | interactionCount = model.interactionCount + 1 }
 
         ( ScanComplete, FinalScanInProgress ) ->
             init
 
         ( SocketError message, _ ) ->
-            appendError { msg = "VNC error:" ++ message } model
+            appendLogEntry
+                { msg = "VNC error:" ++ message, level = Data.Error }
+                model
 
         ( GuacamoleError message, _ ) ->
-            appendError { msg = "Guacamole error:" ++ message } model
+            appendLogEntry
+                { msg = "Guacamole error:" ++ message, level = Data.Error }
+                model
 
         ( Log message, _ ) ->
-            appendLog message model
+            let
+                entry =
+                    { msg = message, level = Data.Info }
+            in
+            appendLogEntry entry model
 
         ( URLChanged newUrl, _ ) ->
             -- todo
@@ -232,13 +255,14 @@ processScanUpdate scanUpdate model =
 
         ( _, _ ) ->
             -- Illegal state
-            appendError
+            appendLogEntry
                 { msg =
                     "Illegal State. (msg="
                         ++ scanUpdateToString scanUpdate
                         ++ ", state="
                         ++ Data.stateToString model.scanState
                         ++ ")"
+                , level = Data.Error
                 }
                 model
 
@@ -255,7 +279,7 @@ processRequestResult result newScanState =
                     identity
 
         Err error ->
-            appendError (Data.errorFromResponse error)
+            appendLogEntry (Data.errorFromResponse error)
 
 
 updateScanState : ScanState -> Model -> Model
@@ -263,16 +287,11 @@ updateScanState newState model =
     { model | scanState = newState }
 
 
-appendError : ServerError -> Model -> Model
-appendError err model =
+appendLogEntry : LogEntry -> Model -> Model
+appendLogEntry entry model =
     { model
-        | errors = err :: model.errors
+        | log = entry :: model.log
     }
-
-
-appendLog : String -> Model -> Model
-appendLog msg model =
-    { model | log = msg :: model.log }
 
 
 
@@ -293,43 +312,99 @@ view : Model -> Html Msg
 view model =
     div
         [ class "container-fluid" ]
-        [ h2 [] [ text "Interactive Privacy Scanner" ]
-        , viewStartInput model
-        , div [ class "row m-2", style "height" "1000px" ]
-            [ viewGuacamoleDisplay model
-            , viewStatusPanel model
+        [ div [ class "row" ]
+            [ viewStatusPanel model
+            , viewGuacamoleDisplay model
             ]
+        ]
+
+
+viewStatusPanel : Model -> Html Msg
+viewStatusPanel model =
+    div
+        [ class "col"
+        , class "col-md-4"
+        , class "bg-light"
+        , class "vh-100"
+        ]
+        [ h4 [ class "m-3", class "text-center" ] [ text "Interactive Privacyscanner" ]
+        , viewStartInput model
+        , View.viewDescriptionText "Status" <| Data.stateToString model.scanState
+        , View.viewDescriptionText "Current URL" model.currentUrl
+        , View.viewDescriptionText "Interactions" <| String.fromInt model.interactionCount
+        , viewButtons (model.scanState == AwaitingInteraction)
+        , View.viewLog model.log
         ]
 
 
 viewStartInput : Model -> Html Msg
 viewStartInput model =
-    div [ class "row m-2" ]
-        [ div [ class "col-md-6 mx-auto" ]
-            [ label
-                [ attribute "for" "url_input" ]
-                [ text "Enter URL to perform an interactive scan:" ]
-            , div [ class "input-group mb-3" ]
-                [ input
-                    [ attribute "type" "text"
-                    , class "form-control"
-                    , attribute "id" "url_input"
-                    , attribute
-                        "aria-describedby"
-                        "basic-addon3"
-                    , attribute
-                        "placeholder"
-                        "url, e.g. uni-bamberg.de"
-                    , onInput UpdateUrlInput
-                    ]
-                    [ text model.urlInput ]
-                , button
-                    [ class "btn btn-primary"
-                    , attribute "type" "button"
-                    , onClick StartScan
-                    ]
-                    [ text "Start Scan" ]
+    div [ class "mx-3" ]
+        [ div [ class "input-group mb-2" ]
+            [ input
+                [ attribute "type" "text"
+                , class "form-control"
+                , attribute
+                    "placeholder"
+                    "Enter a URL to perform an interactive scan"
+                , onInput UpdateUrlInput
                 ]
+                [ text model.urlInput ]
+            , button
+                [ class "btn btn-primary"
+                , attribute "type" "button"
+                , onClick StartScan
+                ]
+                [ text "Start Scan" ]
+            ]
+        ]
+
+
+viewButtons : Bool -> Html Msg
+viewButtons awaitingInteraction =
+    div [ class "container", class "m-1" ]
+        [ div
+            [ class "row" ]
+            [ button
+                [ class "btn"
+                , class "btn-secondary"
+                , class "col"
+                , class "m-1"
+                , onClick TakeScreenshot
+                , disabled <| not awaitingInteraction
+                ]
+                [ text "Take Screenshot" ]
+            , button
+                [ class "btn"
+                , class "btn-secondary"
+                , class "col"
+                , class "m-1"
+                , onClick ClearBrowserCookies
+                , disabled <| not awaitingInteraction
+                ]
+                [ text "Clear Cookies" ]
+            ]
+        , div
+            [ class "row" ]
+            [ button
+                [ class "btn"
+                , class "btn-primary"
+                , class "m-1"
+                , onClick RegisterInteraction
+                , disabled <| not awaitingInteraction
+                ]
+                [ text "Register User Interaction" ]
+            ]
+        , div
+            [ class "row" ]
+            [ button
+                [ class "btn"
+                , class "btn-success"
+                , class "m-1"
+                , onClick FinishScan
+                , disabled <| not awaitingInteraction
+                ]
+                [ text "Finish Scan" ]
             ]
         ]
 
@@ -357,112 +432,3 @@ viewGuacamoleDisplay model =
         , onMouseLeave (SetGuacamoleFocus False)
         ]
         []
-
-
-viewStatusPanel : Model -> Html Msg
-viewStatusPanel model =
-    let
-        awaitingInteraction =
-            model.scanState == AwaitingInteraction
-    in
-    div
-        [ class "col-md-4", class "bg-light" ]
-        [ descriptionList
-            [ ( "Status", Data.stateToString model.scanState )
-            , ( "Current URL", model.currentUrl )
-            , ( "Interactions", String.fromInt model.interactionCount )
-            ]
-        , viewErrors model.errors
-        , viewLogs model.log
-        , div [ class "row", class "m-2" ]
-            [ button
-                [ class "btn"
-                , class "btn-secondary"
-                , class "col-sm"
-                , class "mx-1"
-                , onClick TakeScreenshot
-                , disabled <| not awaitingInteraction
-                ]
-                [ text "Take Screenshot" ]
-            , button
-                [ class "btn"
-                , class "btn-secondary"
-                , class "col-sm"
-                , class "mx-1"
-                , onClick ClearBrowserCookies
-                , disabled <| not awaitingInteraction
-                ]
-                [ text "Clear Cookies" ]
-            ]
-        , div
-            [ class "row", class "m-2" ]
-            [ button
-                [ class "btn"
-                , class "btn-primary"
-                , onClick RegisterInteraction
-                , disabled <| not awaitingInteraction
-                ]
-                [ text "Register User Interaction" ]
-            ]
-        , div [ class "row", class "m-2" ]
-            [ button
-                [ class "btn"
-                , class "btn-success"
-                , onClick FinishScan
-                , disabled <| not awaitingInteraction
-                ]
-                [ text "Finish Scan" ]
-            ]
-        ]
-
-
-descriptionList : List ( String, String ) -> Html Msg
-descriptionList items =
-    dl [ class "row", class "m-2" ]
-        (items
-            |> List.map descriptionListItem
-            |> List.concat
-        )
-
-
-descriptionListItem : ( String, String ) -> List (Html Msg)
-descriptionListItem ( k, v ) =
-    [ dt [ class "col-sm-3" ] [ text k ]
-    , dd [ class "col-sm-9" ] [ text v ]
-    ]
-
-
-viewErrors : List ServerError -> Html Msg
-viewErrors serverErrors =
-    let
-        viewErrorEntry e =
-            li [ class "list-group-item-danger" ] [ text e.msg ]
-    in
-    div
-        [ class "row", class "m-2" ]
-        [ div [ class "col-sm-3" ] [ b [] [ text "Errors" ] ]
-        , if List.isEmpty serverErrors then
-            div [ class "col-sm-9" ] [ text "no errors :)" ]
-
-          else
-            ul [ class "col", class "list-group" ] <|
-                List.map viewErrorEntry serverErrors
-        ]
-
-
-viewLogs : List String -> Html Msg
-viewLogs log =
-    let
-        viewLogEntry e =
-            li [ class "list-group-item-info" ] [ text e ]
-    in
-    div
-        [ class "row", class "m-2" ]
-        [ div [ class "col-sm-3" ] [ b [] [ text "Log" ] ]
-        , if List.isEmpty log then
-            text ""
-
-          else
-            ul [ class "col", class "list-group" ] <|
-                List.map viewLogEntry log
-        ]

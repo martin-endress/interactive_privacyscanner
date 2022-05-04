@@ -1,4 +1,4 @@
-module Scan.Data exposing (ContainerStartInfo, ScanState(..), ScanUpdate(..), ServerError, errorFromResponse, errorFromStringResponse, mapScanUpdated, scanUpdateToString, stateToString)
+module Scan.Data exposing (ContainerStartInfo, LogEntry, LogLevel(..), ScanState(..), ScanUpdate(..), errorFromResponse, errorFromStringResponse, mapScanUpdated, scanUpdateToString, stateToString)
 
 import Http.Detailed exposing (Error(..))
 import Json.Decode as D exposing (Decoder)
@@ -12,25 +12,40 @@ type alias ContainerStartInfo =
     }
 
 
-type alias ServerError =
+type LogLevel
+    = Info
+    | Warning
+    | Error
+
+
+type alias LogEntry =
     { msg : String
+    , level : LogLevel
     }
 
 
-errorFromResponse : Error a -> ServerError
+errorFromResponse : Error a -> LogEntry
 errorFromResponse err =
     case err of
         BadUrl url ->
-            { msg = "Bad input URL: " ++ url }
+            { msg = "Bad input URL: " ++ url
+            , level = Error
+            }
 
         Timeout ->
-            { msg = "Server Timeout" }
+            { msg = "Server Timeout"
+            , level = Error
+            }
 
         NetworkError ->
-            { msg = "Network Error" }
+            { msg = "Network Error"
+            , level = Error
+            }
 
         BadStatus meta _ ->
-            { msg = "Bad Status " ++ fromInt meta.statusCode }
+            { msg = "Bad Status " ++ fromInt meta.statusCode
+            , level = Error
+            }
 
         BadBody meta _ str ->
             { msg =
@@ -39,23 +54,32 @@ errorFromResponse err =
                     ++ " (status="
                     ++ fromInt meta.statusCode
                     ++ ")"
+            , level = Error
             }
 
 
-errorFromStringResponse : Error String -> ServerError
+errorFromStringResponse : Error String -> LogEntry
 errorFromStringResponse err =
     case err of
         BadUrl url ->
-            { msg = "Bad input URL: " ++ url }
+            { msg = "Bad input URL: " ++ url
+            , level = Error
+            }
 
         Timeout ->
-            { msg = "Server Timeout" }
+            { msg = "Server Timeout"
+            , level = Error
+            }
 
         NetworkError ->
-            { msg = "Network Error" }
+            { msg = "Network Error"
+            , level = Error
+            }
 
         BadStatus meta body ->
-            { msg = "Bad Status " ++ fromInt meta.statusCode ++ ": " ++ body }
+            { msg = "Bad Status " ++ fromInt meta.statusCode ++ ": " ++ body
+            , level = Error
+            }
 
         BadBody meta body str ->
             { msg =
@@ -66,6 +90,7 @@ errorFromStringResponse err =
                     ++ " (status="
                     ++ fromInt meta.statusCode
                     ++ ")"
+            , level = Error
             }
 
 
@@ -81,7 +106,7 @@ stateToString : ScanState -> String
 stateToString status =
     case status of
         Idle ->
-            "No site selected, please select an URL."
+            "No site selected, please select a URL."
 
         ConnectingToBrowser ->
             "Connecting to browser, please wait."
