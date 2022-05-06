@@ -310,6 +310,7 @@ viewStatusPanel : Model -> Html Msg
 viewStatusPanel model =
     div
         [ class "col-4"
+        , class "p-0"
         , class "bg-light"
         , class "vh-100"
         ]
@@ -401,23 +402,33 @@ viewGuacamoleDisplay : Model -> Html Msg
 viewGuacamoleDisplay model =
     let
         visibility =
-            if model.scanState == Idle then
+            if model.scanState == Idle || model.scanState == ConnectingToBrowser then
                 "hidden"
 
             else
                 "visible"
+
+        borderColor =
+            if model.scanState == AwaitingInteraction then
+                if model.guacamoleFocus then
+                    "success"
+
+                else
+                    "info"
+
+            else
+                "warning"
     in
     div
         [ class "col-8"
+        , class "p-0"
         , style "width" "max-content"
         ]
         [ div
             [ attribute "id" "display"
-            , classList
-                [ ( "border", model.guacamoleFocus )
-                , ( "border-success", model.guacamoleFocus )
-                , ( "border-2", model.guacamoleFocus )
-                ]
+            , class "border"
+            , class <| "border" ++ "-" ++ borderColor
+            , class "border-3"
             , style "visibility" visibility
             , onMouseEnter (SetGuacamoleFocus True)
             , onMouseLeave (SetGuacamoleFocus False)
