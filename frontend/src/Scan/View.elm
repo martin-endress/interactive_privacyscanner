@@ -1,9 +1,9 @@
 module Scan.View exposing (viewDescription, viewDescriptionText, viewLog)
 
 import Html exposing (Html, b, dd, div, dl, dt, li, text, ul)
-import Html.Attributes exposing (class)
+import Html.Attributes exposing (class, style)
+import List exposing (length)
 import Scan.Data exposing (LogEntry, LogLevel(..))
-import Html.Attributes exposing (style)
 
 
 viewLog : List LogEntry -> Html msg
@@ -30,12 +30,19 @@ viewLog log =
                     , class <| "list-group-item-" ++ levelToString entry.level
                     ]
                     [ text entry.msg ]
+
+            logText =
+                if List.isEmpty log then
+                    "no entries"
+
+                else
+                    String.fromInt (List.length log) ++ " entries"
         in
         div []
-            [ b [ class "mx-3" ] [ text "Log" ]
+            [ viewDescriptionText "Log" logText
             , ul
                 [ class "col"
-                , class "m-3"
+                , class "mx-3"
                 , class "list-group"
                 , style "max-height" "15em"
                 , class "overflow-auto"

@@ -9,7 +9,7 @@ import Http exposing (Metadata)
 import Http.Detailed exposing (Error)
 import Json.Decode as D
 import Json.Encode as E
-import Maybe exposing (withDefault)
+import Maybe
 import Scan.Data as Data exposing (ContainerStartInfo, LogEntry, ScanState(..), ScanUpdate(..), scanUpdateToString)
 import Scan.Requests as Requests
 import Scan.View as View
@@ -79,21 +79,8 @@ init =
     , currentUrl = ""
     , urlInput = ""
     , guacamoleFocus = False
-    , log = sampleLog
+    , log = []
     }
-
-
-sampleLog =
-    [ { msg = "Info log message", level = Data.Info }
-    , { msg = "Warning log message", level = Data.Warning }
-    , { msg = "Error log message", level = Data.Error }
-    , { msg = "asdfLong message:  Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus mollis venenatis augue vehicula tristique. Integer felis ante, consectetur id mi eu, efficitur luctus lorem. Quisque risus lorem, vulputate eu imperdiet sed, tincidunt commodo justo. Cras tincidunt lacus ligula, pretium sollicitudin tortor congue a. Phasellus id convallis leo. Vivamus quis tincidunt lectus. Pellentesque commodo, urna sit amet vulputate fringilla, risus lacus vulputate odio, eget aliquet mauris diam eu metus. Vivamus auctor sit amet justo eu placerat. Donec mi diam, egestas ac mi et, pharetra convallis lectus. Nulla ultrices libero id leo blandit, nec luctus magna feugiat. "
-      , level = Data.Error
-      }
-    , { msg = "asdfLong message:  Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus mollis venenatis augue vehicula tristique. Integer felis ante, consectetur id mi eu, efficitur luctus lorem. Quisque risus lorem, vulputate eu imperdiet sed, tincidunt commodo justo. Cras tincidunt lacus ligula, pretium sollicitudin tortor congue a. Phasellus id convallis leo. Vivamus quis tincidunt lectus. Pellentesque commodo, urna sit amet vulputate fringilla, risus lacus vulputate odio, eget aliquet mauris diam eu metus. Vivamus auctor sit amet justo eu placerat. Donec mi diam, egestas ac mi et, pharetra convallis lectus. Nulla ultrices libero id leo blandit, nec luctus magna feugiat "
-      , level = Data.Error
-      }
-    ]
 
 
 
@@ -312,7 +299,7 @@ view : Model -> Html Msg
 view model =
     div
         [ class "container-fluid" ]
-        [ div [ class "row" ]
+        [ div [ class "row", class "justify-content-center" ]
             [ viewStatusPanel model
             , viewGuacamoleDisplay model
             ]
@@ -322,8 +309,7 @@ view model =
 viewStatusPanel : Model -> Html Msg
 viewStatusPanel model =
     div
-        [ class "col"
-        , class "col-md-4"
+        [ class "col-4"
         , class "bg-light"
         , class "vh-100"
         ]
@@ -390,6 +376,7 @@ viewButtons awaitingInteraction =
                 [ class "btn"
                 , class "btn-primary"
                 , class "m-1"
+                , class "col"
                 , onClick RegisterInteraction
                 , disabled <| not awaitingInteraction
                 ]
@@ -401,6 +388,7 @@ viewButtons awaitingInteraction =
                 [ class "btn"
                 , class "btn-success"
                 , class "m-1"
+                , class "col"
                 , onClick FinishScan
                 , disabled <| not awaitingInteraction
                 ]
@@ -420,15 +408,19 @@ viewGuacamoleDisplay model =
                 "visible"
     in
     div
-        [ attribute "id" "display"
-        , classList
-            [ ( "col", True )
-            , ( "border", model.guacamoleFocus )
-            , ( "border-success", model.guacamoleFocus )
-            , ( "border-2", model.guacamoleFocus )
-            ]
-        , style "visibility" visibility
-        , onMouseEnter (SetGuacamoleFocus True)
-        , onMouseLeave (SetGuacamoleFocus False)
+        [ class "col-8"
+        , style "width" "max-content"
         ]
-        []
+        [ div
+            [ attribute "id" "display"
+            , classList
+                [ ( "border", model.guacamoleFocus )
+                , ( "border-success", model.guacamoleFocus )
+                , ( "border-2", model.guacamoleFocus )
+                ]
+            , style "visibility" visibility
+            , onMouseEnter (SetGuacamoleFocus True)
+            , onMouseLeave (SetGuacamoleFocus False)
+            ]
+            []
+        ]
