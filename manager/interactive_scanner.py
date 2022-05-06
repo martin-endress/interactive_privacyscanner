@@ -16,14 +16,8 @@ from errors import ScannerInitError, ScannerError
 from scanner_messages import ScannerMessage, MessageType
 
 EXTRACTOR_CLASSES = [CookiesExtractor]
-INTERACTION_BREAKPOINTS = ["focus", "click", "mouseWheel"]
 
 logger = logging.getLogger('scanner')
-
-
-class UserInteraction:
-    def _init_(self):
-        self._user_interaction = asyncio.Event()
 
 
 class InteractiveScanner(Thread):
@@ -52,23 +46,10 @@ class InteractiveScanner(Thread):
         self._page_loaded = asyncio.Event()
         self._request_will_be_sent = asyncio.Event()
         self._response_log = []
-        self._user_interaction = asyncio.Event()
         self.stop_scan_event = asyncio.Event()
 
     async def _init_queue(self):
         self._queue = janus.Queue()
-
-    def set_socket(self, socket):
-        self.client_socket = socket
-
-    def send_socket_msg(self, msg):
-        msg_json = json.dumps(msg)
-        if self.client_socket == None:
-            logger.error('Client socket not set up, ignoring message:' + msg_json)
-            return
-        else:
-            logger.info('sending message' + msg_json)
-            self.client_socket.send(msg_json)
 
     def run(self):
         self.event_loop.run_until_complete(self._start_scanner())
@@ -115,8 +96,26 @@ class InteractiveScanner(Thread):
                     f"Unknown command '{unknown_command}' ignored.")
         return False
 
+    # Socket Communication
+
+    def set_socket(self, socket):
+        self.client_socket = socket
+
+    def send_socket_msg(self, msg):
+        msg_json = json.dumps(msg)
+        if self.client_socket == None:
+            logger.error('Client socket not set up, ignoring message:' + msg_json)
+            return
+        else:
+            logger.info('sending message' + msg_json)
+            self.client_socket.send(msg_json)
+
+    # Scanner Functions
+
     async def _start_scan(self):
-        # Create new target and navigate to page
+        """
+        Create new target and navigate to page
+        """
         self.target = await self._new_target()
         await self._register_callbacks()
         await self.target.Input.setIgnoreInputEvents(ignore=True)
@@ -141,10 +140,6 @@ class InteractiveScanner(Thread):
         await self.target.Page.navigate(url=self.url)
         await self.target.BackgroundService.startObserving(service="backgroundFetch")
         return await self._await_page_load()
-
-    # Activate Debugger breakpoints
-    # for event_name in INTERACTION_BREAKPOINTS:
-    #    await self.target.DOMDebugger.setEventListenerBreakpoint(eventName=event_name)
 
     async def _record_information(self, reason):
         target_info = await self.target.Target.getTargetInfo()
@@ -195,6 +190,12 @@ class InteractiveScanner(Thread):
         podman_container.stop_container(self.container_id)
         self.send_socket_msg({"ScanComplete":""})
 
+    async def _clear_cookies(self):
+        await self.target.Network.clearBrowserCookies()
+        self.send_socket_msg({"Log": "Cookies deleted"})
+
+    # Callback Functions
+
     async def _set_page_loaded(self, **kwargs):
         self._page_loaded.set()
 
@@ -202,18 +203,11 @@ class InteractiveScanner(Thread):
         if frame['url'] != 'about:blank':
             self.send_socket_msg({"URLChanged": frame['url']})
 
-    async def _clear_cookies(self):
-        await self.target.Network.clearBrowserCookies()
-        self.send_socket_msg({"Log": "Cookies deleted"})
-    
-    async def _take_screenshot(self):
-        screenshot = await self.target.Page.captureScreenshot()
-        self.result.add_image('screenshot_interaction.png', screenshot['data'])
-        self.send_socket_msg({"Log": "Screenshot saved"})
-
     async def _set_request_will_be_sent(self, **kwargs):
-        self._user_interaction_reason = "request_will_be_sent"
-        self._user_interaction.set()
+        pass
+
+    async def _request_served_from_cache(self, **kwargs):
+        pass
 
     async def _response_received(self, response, **kwargs):
         self._response_log.append(response)
@@ -221,37 +215,6 @@ class InteractiveScanner(Thread):
     async def _backgroundServiceEventReceived(self, backgroundServiceEvent, **kwargs):
         self.logger.info("Background service Event")
 
-    async def _debugger_paused(self, reason, data, **kwargs):
-        self.logger.info("Debugger Paused, reason: %s, data: %s" %
-                         (reason, data))
-        await self.target.Debugger.resume()
-        self.debugger_paused = True
-        if reason == "EventListener":
-            event_name = data["eventName"]
-            event_name = event_name[len("listener:"):]
-            if event_name in INTERACTION_BREAKPOINTS:
-                self._user_interaction_reason = event_name
-                self._user_interaction.set()
-                return
-        # self.logger.info("EROOR: %s", reason)
-        # self.debugger_paused = False
-        # self.logger.info("Debugger resumed")
-
-    async def scroll_down_up(self):
-        layout = await self.target.Page.getLayoutMetrics()
-        height = layout['contentSize']['height']
-        self.logger.info(height)
-        viewport_height = layout['visualViewport']['clientHeight']
-        viewport_width = layout['visualViewport']['clientWidth']
-        x = random.randint(0, viewport_width - 1)
-        y = random.randint(0, viewport_height - 1)
-        await self.target.Input.setIgnoreInputEvents(ignore=False)
-        await self.target.Input.dispatchMouseEvent(
-            type="mouseWheel", x=x, y=y, deltaX=0, deltaY=height)
-        await asyncio.sleep(0.5)
-        await self.target.Input.dispatchMouseEvent(
-            type="mouseWheel", x=10, y=10, deltaX=0, deltaY=-height)
-        await self.target.Input.setIgnoreInputEvents(ignore=True)
 
     async def _register_callbacks(self):
         """
@@ -268,13 +231,14 @@ class InteractiveScanner(Thread):
         # Enable callbacks
         self.target.register_event(
             "Network.loadingFinished", self._set_page_loaded)
-        self.target.register_event("Page.frameNavigated", self._set_frame_navigated)
+        self.target.register_event(
+            "Page.frameNavigated", self._set_frame_navigated)
         self.target.register_event(
             "Network.requestWillBeSent", self._set_request_will_be_sent)
         self.target.register_event(
-            "Network.responseReceived", self._response_received)
+            "Network.requestServedFromCache", self._request_served_from_cache)
         self.target.register_event(
-            "Debugger.paused", self._debugger_paused)
+            "Network.responseReceived", self._response_received)
         self.target.register_event(
             "BackgroundService.backgroundServiceEventReceived", self._backgroundServiceEventReceived)
 
@@ -296,3 +260,48 @@ class InteractiveScanner(Thread):
             if not loaded:
                 return True
         raise TimeoutError("Page did not load in time.")
+
+
+# UNUSED FUNCTIONS TODO
+
+    #self.target.register_event(
+        #    "Debugger.paused", self._debugger_paused)
+        
+
+    async def _debugger_paused(self, reason, data, **kwargs):
+        self.logger.info("Debugger Paused, reason: %s, data: %s" %
+                         (reason, data))
+        await self.target.Debugger.resume()
+        self.debugger_paused = True
+        if reason == "EventListener":
+            event_name = data["eventName"]
+            event_name = event_name[len("listener:"):]
+            if event_name in INTERACTION_BREAKPOINTS:
+                #self._user_interaction_reason = event_name
+                self._user_interaction.set()
+                return
+        # self.logger.info("EROOR: %s", reason)
+        # self.debugger_paused = False
+        # self.logger.info("Debugger resumed")
+
+    async def scroll_down_up(self): # not used TODO
+        layout = await self.target.Page.getLayoutMetrics()
+        height = layout['contentSize']['height']
+        self.logger.info(height)
+        viewport_height = layout['visualViewport']['clientHeight']
+        viewport_width = layout['visualViewport']['clientWidth']
+        x = random.randint(0, viewport_width - 1)
+        y = random.randint(0, viewport_height - 1)
+        await self.target.Input.setIgnoreInputEvents(ignore=False)
+        await self.target.Input.dispatchMouseEvent(
+            type="mouseWheel", x=x, y=y, deltaX=0, deltaY=height)
+        await asyncio.sleep(0.5)
+        await self.target.Input.dispatchMouseEvent(
+            type="mouseWheel", x=10, y=10, deltaX=0, deltaY=-height)
+        await self.target.Input.setIgnoreInputEvents(ignore=True)
+
+    # INTERACTION_BREAKPOINTS = ["focus", "click", "mouseWheel"]
+
+    # Activate Debugger breakpoints
+    # for event_name in INTERACTION_BREAKPOINTS:
+    #    await self.target.DOMDebugger.setEventListenerBreakpoint(eventName=event_name)
