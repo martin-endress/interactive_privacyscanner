@@ -46,8 +46,8 @@ class InteractiveScanner(Thread):
         self._extractors = []
         self._page_loaded = asyncio.Event()
         self._request_will_be_sent = asyncio.Event()
-        self._response_log = []
         self.stop_scan_event = asyncio.Event()
+        self.page = Page()
 
     async def _init_queue(self):
         self._queue = janus.Queue()
@@ -166,8 +166,7 @@ class InteractiveScanner(Thread):
         url = target_info["targetInfo"]["url"]
         url_parsed = urlparse(url)
         if not self.start_url_netloc == url_parsed.netloc:
-            self.logger.warning("Site exited or forwarded..")
-            # return  # TODO RETURN WITH ERROR
+            self.logger.info("Site exited or forwarded..")
 
         intermediate_result = {"url": url, "event": reason}
         self._extractors.clear()
@@ -180,8 +179,8 @@ class InteractiveScanner(Thread):
         for extractor in self._extractors:
             extractor_info = await extractor.extract_information()
             intermediate_result = intermediate_result | extractor_info.copy()
-        intermediate_result['third parties'] = self.list_third_parties()
-        self._response_log.clear()
+        # intermediate_result['third parties'] = self.list_third_parties()
+        # self._response_log.clear()
         self.result["interaction"].append(intermediate_result.copy())
         time.sleep(2)
 
@@ -223,13 +222,14 @@ class InteractiveScanner(Thread):
         if frame['url'] != 'about:blank':
             self.send_socket_msg({"URLChanged": frame['url']})
 
-    async def _set_request_will_be_sent(self, **kwargs):
-        pass
+    async def _set_request_will_be_sent(self, requestId, request, **kwargs):
+        request['id'] = requestId
+        self.page.add_request(request)
 
     async def _request_served_from_cache(self, **kwargs):
-        pass
+        pass #ignored for now
 
-    async def _response_received(self, response, **kwargs):
+    async def _response_received(self, requestId, response, **kwargs):
         self._response_log.append(response)
 
     async def _backgroundServiceEventReceived(self, backgroundServiceEvent, **kwargs):
@@ -262,6 +262,22 @@ class InteractiveScanner(Thread):
         self.target.register_event(
             "BackgroundService.backgroundServiceEventReceived", self._backgroundServiceEventReceived)
 
+
+
+class Page:
+    def __init__(self):
+        self.request_log = []
+        self.failed_request_log = []
+        self.response_log = []
+
+    def add_request(self, request):
+        self.request_log.append(request)
+    
+    def add_failed_request(self, request):
+        self.failed_request_log.append(request)
+    
+    def add_response(self, response):
+        self.response_log.append(response)
 
 # UNUSED FUNCTIONS TODO
 
