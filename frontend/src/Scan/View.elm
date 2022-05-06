@@ -1,8 +1,8 @@
 module Scan.View exposing (viewDescription, viewDescriptionText, viewLog)
 
-import Html exposing (Html, b, dd, div, dl, dt, li, text, ul)
+import Html exposing (Html, dd, div, dl, dt, li, text, ul)
 import Html.Attributes exposing (class, style)
-import List exposing (length)
+import List
 import Scan.Data exposing (LogEntry, LogLevel(..))
 
 

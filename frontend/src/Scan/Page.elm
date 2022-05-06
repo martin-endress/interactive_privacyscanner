@@ -2,8 +2,8 @@ port module Scan.Page exposing (..)
 
 import Bytes exposing (Bytes)
 import Delay
-import Html exposing (Html, b, button, dd, div, dl, dt, h2, h4, input, label, li, text, ul)
-import Html.Attributes exposing (attribute, class, classList, disabled, style)
+import Html exposing (Html, button, div, h4, input, text)
+import Html.Attributes exposing (attribute, class, disabled, style)
 import Html.Events exposing (onClick, onInput, onMouseEnter, onMouseLeave)
 import Http exposing (Metadata)
 import Http.Detailed exposing (Error)
