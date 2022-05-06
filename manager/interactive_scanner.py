@@ -25,6 +25,7 @@ class InteractiveScanner(Thread):
         super().__init__()
         # Mark this thread as daemon
         self.daemon = True
+
         self.logger = logging.getLogger('cdp_controller_%s' % self.name)
 
         # Init Message Queue
@@ -141,6 +142,25 @@ class InteractiveScanner(Thread):
         await self.target.BackgroundService.startObserving(service="backgroundFetch")
         return await self._await_page_load()
 
+    async def _await_page_load(self):
+        """
+        Waits until the page is loaded. If no page is loaded, the function returns False. A TimeoutError is raised if the timeout is exceeded.
+        :return:
+        """
+        # TODO improve this (#3)
+        self.logger.info("awaiting page load")
+        loaded = await utils.event_wait(self._page_loaded, 0.5)
+        if not loaded:
+            self.logger.info("no update was made, continuing")
+            return loaded
+        for _ in range(6):
+            await asyncio.sleep(1)
+            self._page_loaded.clear()
+            loaded = await utils.event_wait(self._page_loaded, 2)
+            if not loaded:
+                return True
+        raise TimeoutError("Page did not load in time.")
+
     async def _record_information(self, reason):
         target_info = await self.target.Target.getTargetInfo()
         url = target_info["targetInfo"]["url"]
@@ -241,25 +261,6 @@ class InteractiveScanner(Thread):
             "Network.responseReceived", self._response_received)
         self.target.register_event(
             "BackgroundService.backgroundServiceEventReceived", self._backgroundServiceEventReceived)
-
-    async def _await_page_load(self):
-        """
-        Waits until the page is loaded. If no page is loaded, the function returns False. A TimeoutError is raised if the timeout is exceeded.
-        :return:
-        """
-        # TODO improve this (#3)
-        self.logger.info("awaiting page load")
-        loaded = await utils.event_wait(self._page_loaded, 0.5)
-        if not loaded:
-            self.logger.info("no update was made, continuing")
-            return loaded
-        for _ in range(6):
-            await asyncio.sleep(1)
-            self._page_loaded.clear()
-            loaded = await utils.event_wait(self._page_loaded, 2)
-            if not loaded:
-                return True
-        raise TimeoutError("Page did not load in time.")
 
 
 # UNUSED FUNCTIONS TODO
