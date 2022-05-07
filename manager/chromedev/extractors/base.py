@@ -1,6 +1,7 @@
 class Extractor:
-    def __init__(self, target, options):
+    def __init__(self, target, page, options):
         self.target = target
+        self.page = page
         self.options = options
 
     async def extract_information(self):

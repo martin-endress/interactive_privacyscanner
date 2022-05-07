@@ -1,38 +1,26 @@
 import requests
 
+import time
 
 def main():
-    manager_url = "http://localhost:5000/"
+    manager_url = "http://scanner.psi.test/api/"
 
-    print('Please enter URL to be scanned.')
-    url = input()
+    #url = input()
+    url = "http://www.heise.de/"
 
-    response = requests.post(manager_url + "start_instance", json={"url": url}).json()
+    response = requests.post(manager_url + "start_scan", json={"url": url}).json()
     vnc_port = response['vnc_port']
     container_id = response['container_id']
-    print('Container started. VNC PORT: %s' % vnc_port)
+    print('Container started. vnc port: %s, container id: %s' % (vnc_port, container_id))
 
-    print('Press any key to start scan.')
-    input()
+    time.sleep(5)
 
-    response = requests.post(manager_url + "start_scan", json={"container_id": container_id})
-    if response.status_code != 200:
-        print(response)
-
-    while True:
-        print("Press any key to register interaction. 'Q' to quit.")
-        action = input()
-        if action == "Q":
-            break
-        response = requests.post(manager_url + "register_interaction", json={"container_id": container_id})
-        if response.status_code != 200:
-            print(response)
-
+    print('Sutting down container')
+    
     response = requests.post(manager_url + "stop_scan", json={"container_id": container_id})
     if response.status_code != 200:
+        print('error')
         print(response)
-
-    print('scan complete.')
 
 
 if __name__ == "__main__":

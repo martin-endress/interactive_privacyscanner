@@ -11,11 +11,11 @@ import podman_container
 import result
 import utils
 from browser import ChromeBrowser
-from chromedev.extractors import CookiesExtractor
+from chromedev.extractors import CookiesExtractor, RequestsExtractor, ResponsesExtractor
 from errors import ScannerInitError, ScannerError
 from scanner_messages import ScannerMessage, MessageType
 
-EXTRACTOR_CLASSES = [CookiesExtractor]
+EXTRACTOR_CLASSES = [CookiesExtractor, RequestsExtractor, ResponsesExtractor]
 
 logger = logging.getLogger('scanner')
 
@@ -173,6 +173,7 @@ class InteractiveScanner(Thread):
         for extractor_class in EXTRACTOR_CLASSES:
             self._extractors.append(extractor_class(
                 self.target,
+                self.page,
                 self.options
             ))
 
@@ -223,18 +224,21 @@ class InteractiveScanner(Thread):
             self.send_socket_msg({"URLChanged": frame['url']})
 
     async def _set_request_will_be_sent(self, requestId, request, **kwargs):
-        request['id'] = requestId
+        request['request_id'] = requestId
         self.page.add_request(request)
 
     async def _request_served_from_cache(self, **kwargs):
         pass #ignored for now
 
     async def _response_received(self, requestId, response, **kwargs):
-        self._response_log.append(response)
+        response['request_id'] = requestId
+        self.page.add_response(response)
 
     async def _backgroundServiceEventReceived(self, backgroundServiceEvent, **kwargs):
+        # ignored for now
         self.logger.info("Background service Event")
 
+    # Callback Definition
 
     async def _register_callbacks(self):
         """
@@ -278,6 +282,11 @@ class Page:
     
     def add_response(self, response):
         self.response_log.append(response)
+        #for r in self.request_log:
+        #    if r['id'] == requestId:
+        #        if not r['responses']:
+        #            r['responses'] = list()
+        #        r['responses'].append(response)
 
 # UNUSED FUNCTIONS TODO
 

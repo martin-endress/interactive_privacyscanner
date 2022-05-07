@@ -5,6 +5,6 @@ from chromedev.extractors.base import Extractor
 logger = logging.getLogger('response_extractor')
 
 
-class CookiesExtractor(Extractor):
+class ResponsesExtractor(Extractor):
     async def extract_information(self):
-        logger.info('extracting responses')
+        return {'responses': self.page.response_log}
