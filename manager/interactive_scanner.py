@@ -180,22 +180,8 @@ class InteractiveScanner(Thread):
         for extractor in self._extractors:
             extractor_info = await extractor.extract_information()
             intermediate_result = intermediate_result | extractor_info.copy()
-        # intermediate_result['third parties'] = self.list_third_parties()
-        # self._response_log.clear()
+        self.page = Page()
         self.result["interaction"].append(intermediate_result.copy())
-        time.sleep(2)
-
-    def list_third_parties(self):
-        third_parties = list()
-        for entry in self._response_log:
-            url = urlparse(entry['url'])
-            if url.netloc != self.start_url_netloc:
-                content_type = 'not specified'
-                if 'Content-Type' in entry['headers']:
-                    content_type = entry['headers']['Content-Type']
-                third_parties.append(
-                    {'url': url.netloc, 'Content-Type': content_type})
-        return third_parties
 
     async def _register_interaction(self):
         await self.target.Input.setIgnoreInputEvents(ignore=True)
@@ -238,6 +224,9 @@ class InteractiveScanner(Thread):
         # ignored for now
         self.logger.info("Background service Event")
 
+    async def _mouseEventReceived(self, **kwargs):
+        self.send_socket_msg({'Mouse Event': ""})
+
     # Callback Definition
 
     async def _register_callbacks(self):
@@ -253,18 +242,16 @@ class InteractiveScanner(Thread):
         await self.target.Runtime.enable()
 
         # Enable callbacks
-        self.target.register_event(
-            "Network.loadingFinished", self._set_page_loaded)
-        self.target.register_event(
-            "Page.frameNavigated", self._set_frame_navigated)
-        self.target.register_event(
-            "Network.requestWillBeSent", self._set_request_will_be_sent)
-        self.target.register_event(
-            "Network.requestServedFromCache", self._request_served_from_cache)
-        self.target.register_event(
-            "Network.responseReceived", self._response_received)
-        self.target.register_event(
-            "BackgroundService.backgroundServiceEventReceived", self._backgroundServiceEventReceived)
+        events = {
+            "Network.loadingFinished": self._set_page_loaded,
+            "Page.frameNavigated": self._set_frame_navigated,
+            "Network.requestWillBeSent": self._set_request_will_be_sent,
+            "Network.requestServedFromCache": self._request_served_from_cache,
+            "Network.responseReceived": self._response_received,
+            "BackgroundService.backgroundServiceEventReceived": self._backgroundServiceEventReceived
+        }
+        for k,v in events.items():
+            self.target.register_event(k, v)
 
 
 
