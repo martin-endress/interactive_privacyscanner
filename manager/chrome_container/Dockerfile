@@ -1,7 +1,11 @@
 FROM fedora:latest
 
+# Add google chrome to packages
+RUN dnf -y install fedora-workstation-repositories dnf-plugins-core
+RUN dnf config-manager --set-enabled google-chrome
+
 # Install packages
-RUN dnf -y install chromium socat x11vnc xorg-x11-server-Xvfb
+RUN dnf -y install google-chrome-stable socat x11vnc xorg-x11-server-Xvfb
 RUN dnf clean all
 
 # Configure user
@@ -18,7 +22,7 @@ COPY extra/start.sh /home/chrome/start.sh
 
 # Config chrome
 RUN mkdir -p "/home/chrome/.config/chromium/Default"
-COPY extra/Preferences /home/chrome/.config/chromium/Default/Preferences
+COPY extra/Preferences /home/chrome/.config/google-chrome/Default/Preferences
 
 # Config VNC
 RUN mkdir "/home/chrome/.vnc"
@@ -28,6 +32,9 @@ RUN x11vnc -storepasswd "asdf" /home/chrome/.vnc/passwd
 USER root
 RUN chmod +x /home/chrome/start.sh
 RUN mkdir -p /opt/privacyscanner/browser
+
+# Fix ownership
+RUN chown -R chrome:chrome /home/chrome/.config/google-chrome
 
 # Enable services
 RUN systemctl enable privacyscanner_browser
