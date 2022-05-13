@@ -126,7 +126,7 @@ class InteractiveScanner(Thread):
 
     async def _navigate_to_page(self):
         self.logger.info("Navigating to Start URL.")
-        await self.browser.new_page(self.url)
+        await self.browser.navigate_url(self.url)
         await self.browser.await_page_load()
         await self.browser.cpd_send_message("BackgroundService.startObserving", service="backgroundFetch")
 
@@ -141,7 +141,7 @@ class InteractiveScanner(Thread):
         self._extractors.clear()
         for extractor_class in EXTRACTOR_CLASSES:
             self._extractors.append(extractor_class(
-                self.target,
+                self.browser,
                 self.page,
                 self.options
             ))
@@ -183,7 +183,7 @@ class InteractiveScanner(Thread):
     async def _request_served_from_cache(self, **kwargs):
         pass  # ignored for now
 
-    async def _response_received(self, requestId, response, **kwargs):
+    async def _response_received(self, response, requestId, **kwargs):
         response['request_id'] = requestId
         self.page.add_response(response)
 

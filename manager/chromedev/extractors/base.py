@@ -1,6 +1,6 @@
 class Extractor:
-    def __init__(self, target, page, options):
-        self.target = target
+    def __init__(self, browser, page, options):
+        self.browser = browser
         self.page = page
         self.options = options
 

@@ -1,4 +1,5 @@
 import logging
+from urllib.parse import urlparse
 
 from chromedev.extractors.base import Extractor
 

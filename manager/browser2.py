@@ -10,24 +10,27 @@ logger = logging.getLogger('chrome_api')
 class Browser:
     def __init__(self, debugging_port, har_location):
         ip = "localhost"
-        self._debugger_url = "http://{}:{}".format(ip, debugging_port)
+        self._debugger_url = "http://{}:{}/json/version".format(ip, debugging_port)
         self._har_location = har_location
 
     async def __aenter__(self):
+        # TODO sort this mess
         await asyncio.sleep(3)
-
-        logger.debug(self._debugger_url)
         logger.debug(requests.get(self._debugger_url, timeout=2).json())
-        #ws_url = requests.get(self._debugger_url, timeout=2).json()
+        ws_url = requests.get(self._debugger_url, timeout=2).json()["webSocketDebuggerUrl"]
+        await  asyncio.sleep(1)
 
-        # ["webSocketDebuggerUrl"]
-
+        # Create Browser
         self._playwright = await async_playwright().start()
         chromium = self._playwright.chromium
         self._browser = await chromium.connect_over_cdp(ws_url)
+
+        # Create Context (like incognito session)
         self._context = await self._browser.new_context(record_har_path=self._har_location)
 
-        self._cdp_session = await self._browser.new_browser_cdp_session()
+        # Create Tab
+        self._page = await self._context.new_page()
+        self._cdp_session = await self._context.new_cdp_session(self._page)
 
         return self
 
@@ -37,17 +40,19 @@ class Browser:
         await self._playwright.stop()
 
     async def cpd_send_message(self, msg, **params):
-        return await self._cdp_session.send(msg, **params)
+        return await self._cdp_session.send(method=msg, params=params)
 
     def register_event(self, event_name, function):
         self._cdp_session.on(event_name, function)
 
-    async def new_page(self, url):
-        self._page = await self._context.new_page()
+    async def navigate_url(self, url):
         await self._page.goto(url)
 
+    async def get_cookies(self):
+        return await self._context.cookies()
+
     async def await_page_load(self):
-        await self._page.wait_for_load_state('load')
+        # await self._page.wait_for_load_state('load')
         await self._page.wait_for_load_state('networkidle')
 
     async def ignore_inputs(self, ignore):
