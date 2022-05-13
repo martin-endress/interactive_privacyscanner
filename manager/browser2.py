@@ -1,33 +1,57 @@
-from chromedev import Browser
+import asyncio
+import logging
+
+import requests
+from playwright.async_api import async_playwright
+
+logger = logging.getLogger('chrome_api')
+
 
 class Browser:
-    pass
-
-class ChromeBrowser:
-    def __init__(self, debugging_port=9222):
-        self._debugging_port = debugging_port
-        self._browser_ip = "localhost"
+    def __init__(self, debugging_port, har_location):
+        ip = "localhost"
+        self._debugger_url = "http://{}:{}".format(ip, debugging_port)
+        self._har_location = har_location
 
     async def __aenter__(self):
-        self.browser = Browser(
-            debugger_url="http://{}:{}".format(self._browser_ip, self._debugging_port),
-            debug=True,
-        )
-        await self.browser.start()
-        return self.browser
+        await asyncio.sleep(3)
+
+        logger.debug(self._debugger_url)
+        logger.debug(requests.get(self._debugger_url, timeout=2).json())
+        #ws_url = requests.get(self._debugger_url, timeout=2).json()
+
+        # ["webSocketDebuggerUrl"]
+
+        self._playwright = await async_playwright().start()
+        chromium = self._playwright.chromium
+        self._browser = await chromium.connect_over_cdp(ws_url)
+        self._context = await self._browser.new_context(record_har_path=self._har_location)
+
+        self._cdp_session = await self._browser.new_browser_cdp_session()
+
+        return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.browser.close()
+        await self._context.close()
+        await self._browser.close()
+        await self._playwright.stop()
 
+    async def cpd_send_message(self, msg, **params):
+        return await self._cdp_session.send(msg, **params)
 
+    def register_event(self, event_name, function):
+        self._cdp_session.on(event_name, function)
 
-"""
-requirements:
+    async def new_page(self, url):
+        self._page = await self._context.new_page()
+        await self._page.goto(url)
 
-setAutoAttach : Bool -> _
-newTab : Target
-ignoreInputs : Bool -> _
-navigate : URL -> _
-backgroundFetch : _
+    async def await_page_load(self):
+        await self._page.wait_for_load_state('load')
+        await self._page.wait_for_load_state('networkidle')
 
-"""
+    async def ignore_inputs(self, ignore):
+        await self.cpd_send_message('Input.setIgnoreInputEvents', ignore=ignore)
+
+    async def clear_cookies(self):
+        await self._context.clear_cookies()

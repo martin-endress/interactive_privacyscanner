@@ -12,6 +12,9 @@ class DirectoryFileHandler:
         self._files_dir.mkdir(exist_ok=True)
         self._debug_files_dir.mkdir(exist_ok=True)
 
+    def get_file_dir(self):
+        return self._files_dir
+
     def add_file(self, filename, contents, debug):
         output_dir = self._debug_files_dir if debug else self._files_dir
         with (output_dir / filename).open('wb') as f:

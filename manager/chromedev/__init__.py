@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 from collections import defaultdict
+from playwright.async_api import async_playwright
 
 import aiohttp
 import websockets
@@ -107,12 +108,6 @@ class Browser:
         if debug is None:
             debug = os.environ.get("DEBUG") == "1"
         self._debugger_url = debugger_url
-        self._loop = loop
-        self._debug = debug
-        self._websocket_debugger_url = None
-        self._conn = None
-        self._recv_task = None
-        self._id_counter = 0
         self._results = {}
         self._event_callbacks = defaultdict(list)
         self._failed_events = []
@@ -124,7 +119,6 @@ class Browser:
     async def start(self, timeout=None):
         await self._await_browser()
         url = "%s/json/version" % self._debugger_url
-        logger.info('connecting to websocket %s' % url)
         async with aiohttp.ClientSession() as session:
             try:
                 async with session.get(url) as response:
@@ -135,8 +129,7 @@ class Browser:
             else:
                 self._websocket_debugger_url = info["webSocketDebuggerUrl"]
         self._conn = await websockets.connect(self._websocket_debugger_url, ping_interval=None, ping_timeout=None)
-        if self._debug:
-            logger.info("! Websocket connected")
+        logger.debug("! Websocket connected")
         self._recv_task = self._loop.create_task(self._recv_loop())
 
     async def _send_raw(self, json_msg):
