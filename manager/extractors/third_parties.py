@@ -1,7 +1,7 @@
 import logging
 from urllib.parse import urlparse
 
-from chromedev.extractors.base import Extractor
+from extractors.base import Extractor
 
 logger = logging.getLogger('third_parties_extractor')
 

@@ -9,8 +9,8 @@ import janus
 import podman_container
 import result
 from browser2 import Browser
-from chromedev.extractors import CookiesExtractor, RequestsExtractor, ResponsesExtractor
 from errors import ScannerInitError, ScannerError
+from extractors import CookiesExtractor, RequestsExtractor, ResponsesExtractor
 from scanner_messages import ScannerMessage, MessageType
 
 EXTRACTOR_CLASSES = [CookiesExtractor, RequestsExtractor, ResponsesExtractor]
@@ -42,8 +42,6 @@ class InteractiveScanner(Thread):
         self.container_id = container_id
         self.result = result.init_from_scanner(url)
         self._extractors = []
-        self._request_will_be_sent = asyncio.Event()
-        self.stop_scan_event = asyncio.Event()
         self.page = Page()
 
     async def _init_queue(self):
@@ -62,7 +60,7 @@ class InteractiveScanner(Thread):
 
     async def _start_scanner(self):
         har_path = self.result.get_har_path()
-        async with Browser(debugging_port=self.debugging_port, har_location=har_path) as browser:
+        async with Browser(self.debugging_port, har_path) as browser:
             self.browser = browser
             while True:
                 self.logger.info("Waiting for scanner message.")
@@ -70,11 +68,14 @@ class InteractiveScanner(Thread):
                 try:
                     rec_poison_pill = await self._process_message(message)
                     if rec_poison_pill:
-                        self.logger.info('Scan complete, terminating thread.')
-                        return
+                        self.logger.warning('Scan complete, terminating thread.')
+                        break
                 except ScannerError as e:
                     self.logger.error(str(e))
                     continue
+        # Stop container after disconnecting Browser
+        podman_container.stop_container(self.container_id)
+        self.send_socket_msg({"ScanComplete": ""})
 
     async def _process_message(self, message):
         self.logger.info('processing message %s' % str(message))
@@ -163,8 +164,6 @@ class InteractiveScanner(Thread):
         await self.browser.ignore_inputs(True)
         await self._record_information('end scan')
         self.result.store_result()
-        podman_container.stop_container(self.container_id)
-        self.send_socket_msg({"ScanComplete": ""})
 
     async def _clear_cookies(self):
         await self.browser.clear_cookies()
@@ -172,29 +171,20 @@ class InteractiveScanner(Thread):
 
     # Callback Functions
 
-    async def _set_frame_navigated(self, frame, **kwargs):
-        if frame['url'] != 'about:blank':
-            self.send_socket_msg({"URLChanged": frame['url']})
-
-    async def _set_request_will_be_sent(self, requestId, request, **kwargs):
-        request['request_id'] = requestId
+    async def _request_sent(self, request):
         self.page.add_request(request)
 
-    async def _request_served_from_cache(self, **kwargs):
-        pass  # ignored for now
-
-    async def _response_received(self, response, requestId, **kwargs):
-        response['request_id'] = requestId
+    async def _response_received(self, response):
         self.page.add_response(response)
 
-    async def _backgroundServiceEventReceived(self, backgroundServiceEvent, **kwargs):
-        # ignored for now
-        self.logger.info("Background service Event")
+    async def _frame_navigated(self, frame):
+        if frame.url != 'about:blank':
+            self.send_socket_msg({"URLChanged": frame.url})
 
     async def _mouseEventReceived(self, **kwargs):
         self.send_socket_msg({'Mouse Event': ""})
 
-    # Callback Definition
+        # Callback Definition
 
     async def _register_callbacks(self):
         """
@@ -208,12 +198,11 @@ class InteractiveScanner(Thread):
         await self.browser.cpd_send_message('Runtime.enable')
 
         # Enable callbacks
-        self.browser.register_event("Page.frameNavigated", self._set_frame_navigated)
-        self.browser.register_event("Network.requestWillBeSent", self._set_request_will_be_sent)
-        self.browser.register_event("Network.requestServedFromCache", self._request_served_from_cache)
-        self.browser.register_event("Network.responseReceived", self._response_received)
-        self.browser.register_event("BackgroundService.backgroundServiceEventReceived",
-                                    self._backgroundServiceEventReceived)
+        self.browser.register_page_event("request", self._request_sent)
+        self.browser.register_page_event("response", self._response_received)
+        self.browser.register_page_event("framenavigated", self._frame_navigated)
+        # self.browser.register_event("BackgroundService.backgroundServiceEventReceived",
+        #                            self._backgroundServiceEventReceived)
 
 
 class Page:

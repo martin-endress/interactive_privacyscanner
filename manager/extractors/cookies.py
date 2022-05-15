@@ -1,6 +1,6 @@
 import logging
 
-from chromedev.extractors.base import Extractor
+from extractors.base import Extractor
 
 logger = logging.getLogger('cookie_extractor')
 
@@ -15,4 +15,4 @@ class CookiesExtractor(Extractor):
         #         cookie['lifetime'] = -1
         #     else:
         #         cookie['lifetime'] = cookie['expires'] - timestamp
-        return {'cookies': cookies['cookies']}
+        return {}#{'cookies': cookies}
