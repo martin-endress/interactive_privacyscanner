@@ -192,8 +192,12 @@ class InteractiveScanner(Thread):
         self.page.add_response(response)
 
     async def _frame_navigated(self, frame):
-        if frame.url != 'about:blank':
-            self.send_socket_msg({"URLChanged": frame.url})
+        logger.debug(f"Frame navigated. (type: {frame['type']})")
+        frame = frame['frame']
+        if frame['url'] != 'about:blank':
+            url = urlparse(frame['url'])
+            url_str = f"{url.scheme}://{url.netloc}/..."
+            self.send_socket_msg({"URLChanged": url_str})
 
     # Callback Definition
 
@@ -211,7 +215,8 @@ class InteractiveScanner(Thread):
         # Enable callbacks
         self.browser.register_page_event("request", self._request_sent)
         self.browser.register_page_event("response", self._response_received)
-        self.browser.register_page_event("framenavigated", self._frame_navigated)
+        # self.browser.register_page_event("framenavigated", self._frame_navigated)
+        self.browser.register_event("Page.frameNavigated", self._frame_navigated)
         # self.browser.register_event("BackgroundService.backgroundServiceEventReceived",
         #                            self._backgroundServiceEventReceived)
 
