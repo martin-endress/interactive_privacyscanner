@@ -1,8 +1,5 @@
-aiohttp==3.8.1
 Flask==2.1.1
 flask_sock==0.5.2
 janus==1.0.0
-orjson==3.6.8
+playwright==1.21.0
 podman==4.0.0
-requests==2.27.1
-websockets==10.2

@@ -1,8 +1,9 @@
-import logging
 import os
 
 from podman import PodmanClient
 from podman.errors import PodmanError, BuildError, NotFound, APIError
+
+import logs
 
 CHROME_IMAGE_TAG = "chrome_scan"
 PODMAN_SOCKET_URI = "unix:///run/user/1000/podman/podman.sock"
@@ -13,7 +14,7 @@ DEVTOOLS_PORT = 9000
 # (see https://docs.podman.io/en/latest/markdown/podman-system-service.1.html)
 podman_client = PodmanClient(base_url=PODMAN_SOCKET_URI, version="2.0")
 
-logger = logging.getLogger('podman_api')
+logger = logs.get_logger('podman_api')
 
 
 class Container:

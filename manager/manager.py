@@ -1,19 +1,19 @@
 import json
 import logging
-import time
-import logs
+from urllib.parse import urlparse
 
 from flask import Flask, Response, request
 from flask_sock import Sock
 from podman.errors import PodmanError
-from urllib.parse import urlparse
+
+import logs
 from interactive_scanner import InteractiveScanner
 from podman_container import run_container, podman_available, stop_container
 from scanner_messages import ScannerMessage, MessageType
 
 # Init logging
 logs.configure('scan_manager.log')
-logger = logging.getLogger('manager')
+logger = logs.get_logger('manager')
 
 # Init set of scanners (dict access is thread-safe https://docs.python.org/3/glossary.html#term-global-interpreter-lock)
 scanners = dict()
@@ -99,6 +99,7 @@ def stop_scan():
     except ValueError as e:
         return Response('Client Error: %s' % str(e), status=400)
 
+
 @app.route('/clear_cookies', methods=['POST'])
 def clear_cookies():
     try:
@@ -121,6 +122,7 @@ def take_screenshot():
         return Response('Server Error: %s' % str(e), status=500)
     except ValueError as e:
         return Response('Client Error: %s' % str(e), status=400)
+
 
 @sock.route('/addSocket')
 def addSocket(socket):

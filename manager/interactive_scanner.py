@@ -1,23 +1,22 @@
 import asyncio
-import logging
-import random
+import json
+import time
 from threading import Thread
 from urllib.parse import urlparse
-import time
+
 import janus
 
-import json
+import logs
 import podman_container
 import result
-import utils
-from browser import ChromeBrowser
-from chromedev.extractors import CookiesExtractor, RequestsExtractor, ResponsesExtractor
+from browser import Browser
 from errors import ScannerInitError, ScannerError
+from extractors import CookiesExtractor, RequestsExtractor, ResponsesExtractor
 from scanner_messages import ScannerMessage, MessageType
 
 EXTRACTOR_CLASSES = [CookiesExtractor, RequestsExtractor, ResponsesExtractor]
 
-logger = logging.getLogger('scanner')
+logger = logs.get_logger('scanner')
 
 
 class InteractiveScanner(Thread):
@@ -26,7 +25,7 @@ class InteractiveScanner(Thread):
         # Mark this thread as daemon
         self.daemon = True
 
-        self.logger = logging.getLogger('cdp_controller_%s' % self.name)
+        self.logger = logs.get_logger('cdp_controller_%s' % self.name)
 
         # Init Message Queue
         self.event_loop = asyncio.new_event_loop()
@@ -44,10 +43,7 @@ class InteractiveScanner(Thread):
         self.container_id = container_id
         self.result = result.init_from_scanner(url)
         self._extractors = []
-        self._page_loaded = asyncio.Event()
-        self._request_will_be_sent = asyncio.Event()
-        self.stop_scan_event = asyncio.Event()
-        self.page = Page()
+        self.page = Page(int(time.time()))
 
     async def _init_queue(self):
         self._queue = janus.Queue()
@@ -64,19 +60,23 @@ class InteractiveScanner(Thread):
         self._queue.sync_q.put(msg)
 
     async def _start_scanner(self):
-        async with ChromeBrowser(debugging_port=self.debugging_port) as b:
-            self.browser = b
+        har_path = self.result.get_har_path()
+        async with Browser(self.debugging_port, har_path) as browser:
+            self.browser = browser
             while True:
                 self.logger.info("Waiting for scanner message.")
                 message = await self._queue.async_q.get()
                 try:
-                    r = await self._process_message(message)
-                    if r:
+                    rec_poison_pill = await self._process_message(message)
+                    if rec_poison_pill:
                         self.logger.info('Scan complete, terminating thread.')
-                        return
+                        break
                 except ScannerError as e:
                     self.logger.error(str(e))
                     continue
+        # Stop container after disconnecting from browser
+        podman_container.stop_container(self.container_id)
+        self.send_socket_msg({"ScanComplete": ""})
 
     async def _process_message(self, message):
         self.logger.info('processing message %s' % str(message))
@@ -117,204 +117,110 @@ class InteractiveScanner(Thread):
         """
         Create new target and navigate to page
         """
-        self.target = await self._new_target()
         await self._register_callbacks()
-        await self.target.Input.setIgnoreInputEvents(ignore=True)
-        loaded = await self._navigate_to_page()
-        if not loaded:
-            raise ScannerError("Initial page is not loaded.")
-        # Record information
+        await self.browser.ignore_inputs(True)
+        await self._navigate_to_page()
         await self._record_information('initial scan')
-        # Allow inputs
-        await self.target.Input.setIgnoreInputEvents(ignore=False)
-        self.send_socket_msg({"ScanComplete":""})
-
-    async def _new_target(self):
-        await self.browser.Target.setAutoAttach(
-            autoAttach=True, waitForDebuggerOnStart=False, flatten=True
-        )
-        return await self.browser.new_target()
+        await self.browser.ignore_inputs(False)
+        self.send_socket_msg({"ScanComplete": ""})
 
     async def _navigate_to_page(self):
-        # Navigate to url
         self.logger.info("Navigating to Start URL.")
-        await self.target.Page.navigate(url=self.url)
-        await self.target.BackgroundService.startObserving(service="backgroundFetch")
-        return await self._await_page_load()
-
-    async def _await_page_load(self):
-        """
-        Waits until the page is loaded. If no page is loaded, the function returns False. A TimeoutError is raised if the timeout is exceeded.
-        :return:
-        """
-        # TODO improve this (#3)
-        self.logger.info("awaiting page load")
-        loaded = await utils.event_wait(self._page_loaded, 0.5)
-        if not loaded:
-            self.logger.info("no update was made, continuing")
-            return loaded
-        for _ in range(6):
-            await asyncio.sleep(1)
-            self._page_loaded.clear()
-            loaded = await utils.event_wait(self._page_loaded, 2)
-            if not loaded:
-                return True
-        raise TimeoutError("Page did not load in time.")
+        await self.browser.navigate_url(self.url)
+        await self.browser.await_page_load()
+        await self.browser.cpd_send_message("BackgroundService.startObserving", service="backgroundFetch")
 
     async def _record_information(self, reason):
-        target_info = await self.target.Target.getTargetInfo()
+        target_info = await self.browser.cpd_send_message('Target.getTargetInfo')
         url = target_info["targetInfo"]["url"]
         url_parsed = urlparse(url)
         if not self.start_url_netloc == url_parsed.netloc:
             self.logger.info("Site exited or forwarded..")
 
-        intermediate_result = {"url": url, "event": reason}
+        intermediate_result = {"url": url, "event": reason, "timestamp": self.page.scan_time}
         self._extractors.clear()
         for extractor_class in EXTRACTOR_CLASSES:
             self._extractors.append(extractor_class(
-                self.target,
+                self.browser,
                 self.page,
                 self.options
             ))
 
         for extractor in self._extractors:
             extractor_info = await extractor.extract_information()
+            # append result
             intermediate_result = intermediate_result | extractor_info.copy()
-        self.page = Page()
+        self.page = Page(int(time.time()))
         self.result["interaction"].append(intermediate_result.copy())
 
     async def _register_interaction(self):
-        await self.target.Input.setIgnoreInputEvents(ignore=True)
+        await self.browser.ignore_inputs(True)
         await self._record_information('manual interaction')
-        await self.target.Input.setIgnoreInputEvents(ignore=False)
-        self.send_socket_msg({"ScanComplete":""})
+        await self.browser.ignore_inputs(False)
+        self.send_socket_msg({"ScanComplete": ""})
 
     async def _stop_scan(self):
-        await self.target.Input.setIgnoreInputEvents(ignore=True)
+        await self.browser.ignore_inputs(True)
         await self._record_information('end scan')
         self.result.store_result()
-        podman_container.stop_container(self.container_id)
-        self.send_socket_msg({"ScanComplete":""})
 
     async def _clear_cookies(self):
-        await self.target.Network.clearBrowserCookies()
+        await self.browser.clear_cookies()
         self.send_socket_msg({"Log": "Cookies deleted"})
 
     # Callback Functions
 
-    async def _set_page_loaded(self, **kwargs):
-        self._page_loaded.set()
-
-    async def _set_frame_navigated(self, frame, **kwargs):
-        if frame['url'] != 'about:blank':
-            self.send_socket_msg({"URLChanged": frame['url']})
-
-    async def _set_request_will_be_sent(self, requestId, request, **kwargs):
-        request['request_id'] = requestId
+    async def _request_sent(self, request):
         self.page.add_request(request)
 
-    async def _request_served_from_cache(self, **kwargs):
-        pass #ignored for now
-
-    async def _response_received(self, requestId, response, **kwargs):
-        response['request_id'] = requestId
+    async def _response_received(self, response):
         self.page.add_response(response)
 
-    async def _backgroundServiceEventReceived(self, backgroundServiceEvent, **kwargs):
-        # ignored for now
-        self.logger.info("Background service Event")
+    async def _frame_navigated(self, frame):
+        if frame.url != 'about:blank':
+            self.send_socket_msg({"URLChanged": frame.url})
 
     async def _mouseEventReceived(self, **kwargs):
         self.send_socket_msg({'Mouse Event': ""})
 
-    # Callback Definition
+        # Callback Definition
 
     async def _register_callbacks(self):
         """
         Register domain notifications and callbacks
         """
-        # Enable domain notifications
-        await self.target.Network.enable()
-        await self.target.Page.enable()
-        await self.target.DOM.enable()
-        await self.target.Security.enable()
-        await self.target.Debugger.enable()
-        await self.target.Runtime.enable()
+        await self.browser.cpd_send_message('Network.enable')
+        await self.browser.cpd_send_message('Page.enable')
+        await self.browser.cpd_send_message('DOM.enable')
+        await self.browser.cpd_send_message('Security.enable')
+        await self.browser.cpd_send_message('Debugger.enable')
+        await self.browser.cpd_send_message('Runtime.enable')
 
         # Enable callbacks
-        events = {
-            "Network.loadingFinished": self._set_page_loaded,
-            "Page.frameNavigated": self._set_frame_navigated,
-            "Network.requestWillBeSent": self._set_request_will_be_sent,
-            "Network.requestServedFromCache": self._request_served_from_cache,
-            "Network.responseReceived": self._response_received,
-            "BackgroundService.backgroundServiceEventReceived": self._backgroundServiceEventReceived
-        }
-        for k,v in events.items():
-            self.target.register_event(k, v)
-
+        self.browser.register_page_event("request", self._request_sent)
+        self.browser.register_page_event("response", self._response_received)
+        self.browser.register_page_event("framenavigated", self._frame_navigated)
+        # self.browser.register_event("BackgroundService.backgroundServiceEventReceived",
+        #                            self._backgroundServiceEventReceived)
 
 
 class Page:
-    def __init__(self):
+    def __init__(self, scan_time):
+        self.scan_time = scan_time
         self.request_log = []
         self.failed_request_log = []
         self.response_log = []
 
     def add_request(self, request):
         self.request_log.append(request)
-    
+
     def add_failed_request(self, request):
         self.failed_request_log.append(request)
-    
+
     def add_response(self, response):
         self.response_log.append(response)
-        #for r in self.request_log:
+        # for r in self.request_log:
         #    if r['id'] == requestId:
         #        if not r['responses']:
         #            r['responses'] = list()
         #        r['responses'].append(response)
-
-# UNUSED FUNCTIONS TODO
-
-    #self.target.register_event(
-        #    "Debugger.paused", self._debugger_paused)
-        
-
-    async def _debugger_paused(self, reason, data, **kwargs):
-        self.logger.info("Debugger Paused, reason: %s, data: %s" %
-                         (reason, data))
-        await self.target.Debugger.resume()
-        self.debugger_paused = True
-        if reason == "EventListener":
-            event_name = data["eventName"]
-            event_name = event_name[len("listener:"):]
-            if event_name in INTERACTION_BREAKPOINTS:
-                #self._user_interaction_reason = event_name
-                self._user_interaction.set()
-                return
-        # self.logger.info("EROOR: %s", reason)
-        # self.debugger_paused = False
-        # self.logger.info("Debugger resumed")
-
-    async def scroll_down_up(self): # not used TODO
-        layout = await self.target.Page.getLayoutMetrics()
-        height = layout['contentSize']['height']
-        self.logger.info(height)
-        viewport_height = layout['visualViewport']['clientHeight']
-        viewport_width = layout['visualViewport']['clientWidth']
-        x = random.randint(0, viewport_width - 1)
-        y = random.randint(0, viewport_height - 1)
-        await self.target.Input.setIgnoreInputEvents(ignore=False)
-        await self.target.Input.dispatchMouseEvent(
-            type="mouseWheel", x=x, y=y, deltaX=0, deltaY=height)
-        await asyncio.sleep(0.5)
-        await self.target.Input.dispatchMouseEvent(
-            type="mouseWheel", x=10, y=10, deltaX=0, deltaY=-height)
-        await self.target.Input.setIgnoreInputEvents(ignore=True)
-
-    # INTERACTION_BREAKPOINTS = ["focus", "click", "mouseWheel"]
-
-    # Activate Debugger breakpoints
-    # for event_name in INTERACTION_BREAKPOINTS:
-    #    await self.target.DOMDebugger.setEventListenerBreakpoint(eventName=event_name)

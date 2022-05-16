@@ -19,6 +19,9 @@ class Result(object):
         self._file_handler = DirectoryFileHandler(result_file.parent)
         self._updated_keys = set()
 
+    def get_har_path(self):
+        return self._file_handler.get_file_dir() / 'interaction.har'
+
     def add_debug_file(self, filename, contents=None):
         self._file_handler.add_file(
             filename, self._get_file_contents(filename, contents), debug=True)
@@ -127,3 +130,18 @@ def get_result_path(netloc):
     now = datetime.now().strftime("%y-%m-%d_%H-%M")
     dir_name = "%s_%s" % (utils.slugify(netloc), now)
     return (Path("results") / dir_name).resolve()
+
+
+async def parse_request(request):
+    return {"url": request.url,
+            "method": request.method,
+            "headers": await request.all_headers(),
+            "post_data": request.post_data}
+
+
+async def parse_response(response):
+    return {"url": response.url,
+            "request": await parse_request(response.request),
+            "headers": await response.all_headers(),
+            "status": response.status,
+            "security": await response.security_details()}

@@ -1,8 +1,9 @@
-import logging
+from urllib.parse import urlparse
 
-from chromedev.extractors.base import Extractor
+import logs
+from extractors.base import Extractor
 
-logger = logging.getLogger('third_parties_extractor')
+logger = logs.get_logger('third_parties_extractor')
 
 
 class ThirdParties(Extractor):
@@ -17,5 +18,4 @@ class ThirdParties(Extractor):
                     content_type = entry['headers']['Content-Type']
                 third_parties.append(
                     {'url': url.netloc, 'Content-Type': content_type})
-        return {'third_parties':third_parties}
-
+        return {'third_parties': third_parties}

@@ -1,8 +1,9 @@
 import asyncio
+import base64
 import string
 from contextlib import suppress
 from pathlib import Path
-import base64
+
 
 class DirectoryFileHandler:
     def __init__(self, result_dir):
@@ -11,6 +12,9 @@ class DirectoryFileHandler:
         self._debug_files_dir = result_dir / 'debug_files'
         self._files_dir.mkdir(exist_ok=True)
         self._debug_files_dir.mkdir(exist_ok=True)
+
+    def get_file_dir(self):
+        return self._files_dir
 
     def add_file(self, filename, contents, debug):
         output_dir = self._debug_files_dir if debug else self._files_dir
