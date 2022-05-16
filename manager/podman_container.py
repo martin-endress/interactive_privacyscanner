@@ -27,7 +27,7 @@ class Container:
 
 
 def build_container_image():
-    os.chdir("chrome_container")
+    os.chdir("../chrome_container")
     logger.info("Building Container image.")
     try:
         image, logs = podman_client.images.build(
