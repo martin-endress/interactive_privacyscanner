@@ -2,6 +2,7 @@
 
 bin/
 /manager/results
+/manager/logs
 
 ### Elm ###
 frontend/elm.js
