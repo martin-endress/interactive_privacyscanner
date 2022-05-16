@@ -165,7 +165,11 @@ class InteractiveScanner(Thread):
         self.result.store_result()
 
     async def _clear_cookies(self):
+        await self.browser.ignore_inputs(True)
+        await self._record_information('cookies deleted')
         await self.browser.clear_cookies()
+        await self.browser.ignore_inputs(False)
+        self.send_socket_msg({"ScanComplete": ""})
         self.send_socket_msg({"Log": "Cookies deleted"})
 
     # Callback Functions

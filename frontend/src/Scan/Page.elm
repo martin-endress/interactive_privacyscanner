@@ -163,7 +163,7 @@ update msg model =
             ( model
             , model.connection
                 |> Maybe.map .containerId
-                |> Maybe.map (Requests.clearBrowserCookies <| GotRequestResult Nothing)
+                |> Maybe.map (Requests.clearBrowserCookies <| GotRequestResult (Just ScanInProgress))
                 |> Maybe.withDefault Cmd.none
             )
 
