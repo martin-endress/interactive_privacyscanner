@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from threading import Thread
 from urllib.parse import urlparse
 
@@ -42,7 +43,7 @@ class InteractiveScanner(Thread):
         self.container_id = container_id
         self.result = result.init_from_scanner(url)
         self._extractors = []
-        self.page = Page()
+        self.page = Page(int(time.time()))
 
     async def _init_queue(self):
         self._queue = janus.Queue()
@@ -136,7 +137,7 @@ class InteractiveScanner(Thread):
         if not self.start_url_netloc == url_parsed.netloc:
             self.logger.info("Site exited or forwarded..")
 
-        intermediate_result = {"url": url, "event": reason}
+        intermediate_result = {"url": url, "event": reason, "timestamp": self.page.scan_time}
         self._extractors.clear()
         for extractor_class in EXTRACTOR_CLASSES:
             self._extractors.append(extractor_class(
@@ -149,7 +150,7 @@ class InteractiveScanner(Thread):
             extractor_info = await extractor.extract_information()
             # append result
             intermediate_result = intermediate_result | extractor_info.copy()
-        self.page = Page()
+        self.page = Page(int(time.time()))
         self.result["interaction"].append(intermediate_result.copy())
 
     async def _register_interaction(self):
@@ -204,7 +205,8 @@ class InteractiveScanner(Thread):
 
 
 class Page:
-    def __init__(self):
+    def __init__(self, scan_time):
+        self.scan_time = scan_time
         self.request_log = []
         self.failed_request_log = []
         self.response_log = []
