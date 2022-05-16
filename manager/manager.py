@@ -13,7 +13,7 @@ from scanner_messages import ScannerMessage, MessageType
 
 # Init logging
 logs.configure('scan_manager.log')
-logger = logging.getLogger('manager')
+logger = logs.get_logger('manager')
 
 # Init set of scanners (dict access is thread-safe https://docs.python.org/3/glossary.html#term-global-interpreter-lock)
 scanners = dict()

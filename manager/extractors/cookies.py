@@ -1,8 +1,7 @@
-import logging
-
+import logs
 from extractors.base import Extractor
 
-logger = logging.getLogger('cookie_extractor')
+logger = logs.get_logger('cookie_extractor')
 
 
 class CookiesExtractor(Extractor):
@@ -15,4 +14,4 @@ class CookiesExtractor(Extractor):
         #         cookie['lifetime'] = -1
         #     else:
         #         cookie['lifetime'] = cookie['expires'] - timestamp
-        return {}#{'cookies': cookies}
+        return {}  # {'cookies': cookies}

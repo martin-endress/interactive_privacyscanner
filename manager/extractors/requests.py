@@ -1,9 +1,8 @@
-import logging
-
+import logs
 import result
 from extractors.base import Extractor
 
-logger = logging.getLogger('requests_extractor')
+logger = logs.get_logger('requests_extractor')
 
 
 class RequestsExtractor(Extractor):

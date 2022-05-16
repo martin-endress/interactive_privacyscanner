@@ -1,21 +1,21 @@
 import asyncio
 import json
-import logging
 from threading import Thread
 from urllib.parse import urlparse
 
 import janus
 
+import logs
 import podman_container
 import result
-from browser2 import Browser
+from browser import Browser
 from errors import ScannerInitError, ScannerError
 from extractors import CookiesExtractor, RequestsExtractor, ResponsesExtractor
 from scanner_messages import ScannerMessage, MessageType
 
 EXTRACTOR_CLASSES = [CookiesExtractor, RequestsExtractor, ResponsesExtractor]
 
-logger = logging.getLogger('scanner')
+logger = logs.get_logger('scanner')
 
 
 class InteractiveScanner(Thread):
@@ -24,7 +24,7 @@ class InteractiveScanner(Thread):
         # Mark this thread as daemon
         self.daemon = True
 
-        self.logger = logging.getLogger('cdp_controller_%s' % self.name)
+        self.logger = logs.get_logger('cdp_controller_%s' % self.name)
 
         # Init Message Queue
         self.event_loop = asyncio.new_event_loop()
@@ -68,12 +68,12 @@ class InteractiveScanner(Thread):
                 try:
                     rec_poison_pill = await self._process_message(message)
                     if rec_poison_pill:
-                        self.logger.warning('Scan complete, terminating thread.')
+                        self.logger.info('Scan complete, terminating thread.')
                         break
                 except ScannerError as e:
                     self.logger.error(str(e))
                     continue
-        # Stop container after disconnecting Browser
+        # Stop container after disconnecting from browser
         podman_container.stop_container(self.container_id)
         self.send_socket_msg({"ScanComplete": ""})
 
@@ -119,8 +119,6 @@ class InteractiveScanner(Thread):
         await self._register_callbacks()
         await self.browser.ignore_inputs(True)
         await self._navigate_to_page()
-        #        if not loaded:
-        #            raise ScannerError("Initial page is not loaded.")
         await self._record_information('initial scan')
         await self.browser.ignore_inputs(False)
         self.send_socket_msg({"ScanComplete": ""})

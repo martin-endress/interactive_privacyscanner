@@ -3,15 +3,16 @@ import logging
 
 from playwright.async_api import async_playwright
 
-logger = logging.getLogger('chrome_api')
+import logs
+
+logger = logs.get_logger('chrome_api')
 
 
 class Browser:
     def __init__(self, debugging_port, har_location):
         ip = "localhost"
         self._debugger_url = "http://{}:{}".format(ip, debugging_port)
-        self._har_location = har_location # "/home/martin/git/interactive_privacyscanner/manager/results/r2.har"
-        logger.warning(self._har_location)
+        self._har_location = har_location
 
     async def __aenter__(self):
         await self._await_browser()
@@ -35,11 +36,8 @@ class Browser:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self._context.close()
-        await asyncio.sleep(2)
         await self._browser.close()
-        await asyncio.sleep(2)
         await self._playwright.stop()
-        await asyncio.sleep(2)
         logger.warning('playwright stopped')
 
     async def _await_browser(self, timeout=10000):

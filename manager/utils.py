@@ -1,8 +1,9 @@
 import asyncio
+import base64
 import string
 from contextlib import suppress
 from pathlib import Path
-import base64
+
 
 class DirectoryFileHandler:
     def __init__(self, result_dir):
