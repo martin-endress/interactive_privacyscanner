@@ -60,8 +60,8 @@ class InteractiveScanner(Thread):
         self._queue.sync_q.put(msg)
 
     async def _start_scanner(self):
-        har_path = self.result.get_har_path()
-        async with Browser(self.debugging_port, har_path) as browser:
+        files_path = self.result.get_files_path()
+        async with Browser(self.debugging_port, files_path) as browser:
             self.browser = browser
             while True:
                 self.logger.info("Waiting for scanner message.")
@@ -91,6 +91,7 @@ class InteractiveScanner(Thread):
                 await self._take_screenshot()
             case ScannerMessage(message_type=MessageType.StopScan):
                 await self._stop_scan()
+                # send poison pill
                 return True
             case unknown_command:
                 raise ScannerError(
@@ -104,7 +105,7 @@ class InteractiveScanner(Thread):
 
     def send_socket_msg(self, msg):
         msg_json = json.dumps(msg)
-        if self.client_socket == None:
+        if self.client_socket is None:
             logger.error('Client socket not set up, ignoring message:' + msg_json)
             return
         else:
@@ -127,7 +128,6 @@ class InteractiveScanner(Thread):
     async def _navigate_to_page(self):
         self.logger.info("Navigating to Start URL.")
         await self.browser.navigate_url(self.url)
-        await self.browser.await_page_load()
         await self.browser.cpd_send_message("BackgroundService.startObserving", service="backgroundFetch")
 
     async def _record_information(self, reason):
@@ -137,7 +137,11 @@ class InteractiveScanner(Thread):
         if not self.start_url_netloc == url_parsed.netloc:
             self.logger.info("Site exited or forwarded..")
 
-        intermediate_result = {"url": url, "event": reason, "timestamp": self.page.scan_time}
+        intermediate_result = {"url": url,
+                               "event": reason,
+                               "timestamp": self.page.scan_time,
+                               "screenshots": self.page.screenshots,
+                               }
         self._extractors.clear()
         for extractor_class in EXTRACTOR_CLASSES:
             self._extractors.append(extractor_class(
@@ -159,18 +163,25 @@ class InteractiveScanner(Thread):
         await self.browser.ignore_inputs(False)
         self.send_socket_msg({"ScanComplete": ""})
 
-    async def _stop_scan(self):
-        await self.browser.ignore_inputs(True)
-        await self._record_information('end scan')
-        self.result.store_result()
-
     async def _clear_cookies(self):
         await self.browser.ignore_inputs(True)
         await self._record_information('cookies deleted')
         await self.browser.clear_cookies()
         await self.browser.ignore_inputs(False)
         self.send_socket_msg({"ScanComplete": ""})
-        self.send_socket_msg({"Log": "Cookies deleted"})
+        self.send_socket_msg({"Log": "Cookies deleted."})
+
+    async def _take_screenshot(self):
+        path = self.result.get_files_path() / f'screenshot_{self.result.num_screenshots}.jpeg'
+        self.page.add_screenshot_path(path)
+        await self.browser.take_screenshot(path)
+        self.result.num_screenshots += 1
+        self.send_socket_msg({"Log": "Screenshot saved."})
+
+    async def _stop_scan(self):
+        await self.browser.ignore_inputs(True)
+        await self._record_information('end scan')
+        self.result.store_result()
 
     # Callback Functions
 
@@ -184,10 +195,7 @@ class InteractiveScanner(Thread):
         if frame.url != 'about:blank':
             self.send_socket_msg({"URLChanged": frame.url})
 
-    async def _mouseEventReceived(self, **kwargs):
-        self.send_socket_msg({'Mouse Event': ""})
-
-        # Callback Definition
+    # Callback Definition
 
     async def _register_callbacks(self):
         """
@@ -214,6 +222,7 @@ class Page:
         self.request_log = []
         self.failed_request_log = []
         self.response_log = []
+        self.screenshots = []
 
     def add_request(self, request):
         self.request_log.append(request)
@@ -228,3 +237,6 @@ class Page:
         #        if not r['responses']:
         #            r['responses'] = list()
         #        r['responses'].append(response)
+
+    def add_screenshot_path(self, path):
+        self.screenshots.append(str(path))

@@ -13,7 +13,7 @@ class DirectoryFileHandler:
         self._files_dir.mkdir(exist_ok=True)
         self._debug_files_dir.mkdir(exist_ok=True)
 
-    def get_file_dir(self):
+    def get_files_path(self):
         return self._files_dir
 
     def add_file(self, filename, contents, debug):

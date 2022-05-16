@@ -18,9 +18,10 @@ class Result(object):
         self._result_file = result_file
         self._file_handler = DirectoryFileHandler(result_file.parent)
         self._updated_keys = set()
+        self.num_screenshots = 0
 
-    def get_har_path(self):
-        return self._file_handler.get_file_dir() / 'interaction.har'
+    def get_files_path(self):
+        return self._file_handler.get_files_path()
 
     def add_debug_file(self, filename, contents=None):
         self._file_handler.add_file(

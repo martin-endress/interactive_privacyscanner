@@ -1,5 +1,4 @@
 import asyncio
-import logging
 
 from playwright.async_api import async_playwright
 
@@ -7,12 +6,14 @@ import logs
 
 logger = logs.get_logger('chrome_api')
 
+SCREENSHOT_QUALITY = 80
+
 
 class Browser:
-    def __init__(self, debugging_port, har_location):
+    def __init__(self, debugging_port, files_path):
         ip = "localhost"
         self._debugger_url = "http://{}:{}".format(ip, debugging_port)
-        self._har_location = har_location
+        self.files_path = files_path
 
     async def __aenter__(self):
         await self._await_browser()
@@ -23,8 +24,9 @@ class Browser:
         self._browser = await chromium.connect_over_cdp(self._debugger_url)
 
         # Create Context (like incognito session)
+        har_path = self.files_path / 'network.har'
         self._context = await self._browser.new_context(accept_downloads=False,
-                                                        record_har_path=self._har_location,
+                                                        record_har_path=har_path,
                                                         record_har_omit_content=True)
 
         # Create Tab
@@ -56,17 +58,16 @@ class Browser:
         self._page.on(event_name, function)
 
     async def navigate_url(self, url):
-        await self._page.goto(url)
+        await self._page.goto(url, wait_until='domcontentloaded')
 
     async def get_cookies(self):
         return await self._context.cookies()
 
-    async def await_page_load(self):
-        # await self._page.wait_for_load_state('load')
-        await self._page.wait_for_load_state('networkidle')
+    async def clear_cookies(self):
+        await self._context.clear_cookies()
+
+    async def take_screenshot(self, path):
+        await self._page.screenshot(path=path, quality=SCREENSHOT_QUALITY, type='jpeg')
 
     async def ignore_inputs(self, ignore):
         await self.cpd_send_message('Input.setIgnoreInputEvents', ignore=ignore)
-
-    async def clear_cookies(self):
-        await self._context.clear_cookies()
