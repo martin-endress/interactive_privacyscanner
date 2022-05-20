@@ -1,0 +1,85 @@
+[
+  {
+    "callFrames": [
+      {
+        "callFrameId": "1075982278234072428.7.0",
+        "functionName": "v",
+        "functionLocation": {
+          "scriptId": "525",
+          "lineNumber": 0,
+          "columnNumber": 15484
+        },
+        "location": {
+          "scriptId": "525",
+          "lineNumber": 0,
+          "columnNumber": 15493
+        },
+        "url": "",
+        "scopeChain": [
+          {
+            "type": "local",
+            "object": {
+              "type": "object",
+              "className": "Object",
+              "description": "Object",
+              "objectId": "1075982278234072428.7.1"
+            },
+            "name": "v",
+            "startLocation": {
+              "scriptId": "525",
+              "lineNumber": 0,
+              "columnNumber": 15484
+            },
+            "endLocation": {
+              "scriptId": "525",
+              "lineNumber": 0,
+              "columnNumber": 15525
+            }
+          },
+          {
+            "type": "closure",
+            "object": {
+              "type": "object",
+              "className": "Object",
+              "description": "Object",
+              "objectId": "1075982278234072428.7.2"
+            },
+            "name": "2mXy",
+            "startLocation": {
+              "scriptId": "525",
+              "lineNumber": 0,
+              "columnNumber": 11824
+            },
+            "endLocation": {
+              "scriptId": "525",
+              "lineNumber": 0,
+              "columnNumber": 21306
+            }
+          },
+          {
+            "type": "global",
+            "object": {
+              "type": "object",
+              "className": "Window",
+              "description": "Window",
+              "objectId": "1075982278234072428.7.3"
+            }
+          }
+        ],
+        "this": {
+          "type": "object",
+          "subtype": "node",
+          "className": "HTMLButtonElement",
+          "description": "button.message-component.message-button.no-children.focusable.cmp-button.cmp-consent-btn.sp_choice_type_11",
+          "objectId": "1075982278234072428.7.4"
+        }
+      }
+    ],
+    "reason": "EventListener",
+    "data": {
+      "eventName": "listener:click",
+      "targetName": "BUTTON"
+    },
+    "hitBreakpoints": []
+  }
+]

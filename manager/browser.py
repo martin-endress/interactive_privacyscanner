@@ -34,6 +34,7 @@ class Browser:
 
         # CDP session
         self._cdp_session = await self._context.new_cdp_session(self._page)
+        await self.set_dom_breakpoints()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -45,6 +46,12 @@ class Browser:
     async def _await_browser(self, timeout=10000):
         # TODO improve
         await asyncio.sleep(3)
+
+    async def set_dom_breakpoints(self):
+        setEventBreakpoint = "DOMDebugger.setEventListenerBreakpoint"
+        params = {"eventName": "click"}
+        await self._cdp_session.send(setEventBreakpoint, params)
+        self._cdp_session.on('Debugger.paused', debugger_paused)
 
     async def cpd_send_message(self, msg, **params):
         return await self._cdp_session.send(method=msg, params=params)
@@ -71,3 +78,8 @@ class Browser:
 
     async def ignore_inputs(self, ignore):
         await self.cpd_send_message('Input.setIgnoreInputEvents', ignore=ignore)
+
+
+def debugger_paused(*args):
+    logger.info(f"Debugger paused. Reason: args: {str(args)}.")
+    # self.cpd_send_message('Debugger.resume')
