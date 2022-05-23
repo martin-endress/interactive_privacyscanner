@@ -26,7 +26,7 @@ def main():
         print(response)
 
 
-interaction = list()
+interaction_log = list()
 
 
 async def main2():
@@ -41,15 +41,9 @@ async def main2():
         page.on("console", on_console)
 
         # navigate
-        await page.goto("http://heise.de/")
-        # await page.add_script_tag(path="tmp/init.js", type='module')
+        await page.goto("http://example.com/")
 
-        await asyncio.sleep(2)
-        l = page.locator('button:has-text("Zustimmen")')
-        print(await l.count())
-
-        await asyncio.sleep(1500)
-        recording = False
+        await asyncio.sleep(15)
         await browser.close()
 
         # replay interaction
@@ -61,40 +55,28 @@ async def main2():
         await page.add_init_script(path="tmp/init.js")
 
         # navigate
-        await page.goto("http://heise.de/")
-
-        for i in interaction:
-            found = False
-            print(f'Attempting to replay {i}.')
-            locator = page.locator(i)
-            await asyncio.sleep(5)
-            attempts = 5
-            for i in range(attempts):
-                print(f'Attempt {i + 1} of {attempts}')
-                num_locators = await locator.count()
-                print(f'num locators: {num_locators}')
-                if num_locators == 1:
-                    print('locator found, clicking link')
-                    await locator.click()
-                    found = True
-                    break
-                await asyncio.sleep(5)
-            if not found:
-                print('error')
-                break
+        await page.goto("http://example.com/")
+        try:
+            for interaction in interaction_log:
+                await asyncio.sleep(3)
+                selector = interaction['selector']
+                print(f'Attempting to replay {selector} event.')
+                locator = page.locator(selector)
+                await locator.click()
+        except TimeoutError as e:
+            print('Unable to replay interaction, 30s timeout exceeded.')
         await asyncio.sleep(3)
         await browser.close()
 
 
-#        await asyncio.sleep(3)
-
-
 def on_console(console_message):
-    scanner_key = 'SCANNER'
+    scanner_key = 'SCANNER_INTERACTION'
+    print(console_message)
     if console_message.text.startswith(scanner_key):
         scanner_msg = console_message.text[len(scanner_key):]
-        print(scanner_msg)
-        interaction.append(scanner_msg)
+        interaction_json = json.loads(scanner_msg)
+        interaction_log.append(interaction_json)
+        print(interaction_json)
 
 
 if __name__ == "__main__":

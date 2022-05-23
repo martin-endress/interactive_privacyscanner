@@ -1,13 +1,8 @@
-//console.log('a')
 //import {RobulaPlus} from 'https://cdn.jsdelivr.net/gh/martin-endress/interactive_privacyscanner@record-interaction/manager/tmp/index.min.js';
-//console.log('b')
-
-function sendMsg(msg) {
-    console.log('SCANNER' + msg);
-}
 
 function interaction(event, selector) {
-    sendMsg(selector);
+    msg = {'event': event, 'selector': selector}
+    console.log('SCANNER_INTERACTION' + JSON.stringify(msg));
 }
 
 // const ROBULA = new RobulaPlus();
@@ -38,8 +33,8 @@ function isInShadow(el) {
 
 // Event Handlers
 function clickHandler(event) {
-    interaction('', getCssSelector(event.target));
-    //sendMsg(ROBULA.getRobustXPath(event.target, document));
+    interaction('click', getCssSelector(event.target));
+    //interaction('click', ROBULA.getRobustXPath(event.target, document));
 }
 
 // Register Event Handler
