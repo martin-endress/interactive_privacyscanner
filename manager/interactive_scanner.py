@@ -15,6 +15,7 @@ from extractors import CookiesExtractor, RequestsExtractor, ResponsesExtractor
 from scanner_messages import ScannerMessage, MessageType
 
 EXTRACTOR_CLASSES = [CookiesExtractor, RequestsExtractor, ResponsesExtractor]
+SCANNER_KEY = 'SCANNER_INTERACTION'
 
 logger = logs.get_logger('scanner')
 
@@ -43,7 +44,7 @@ class InteractiveScanner(Thread):
         self.container_id = container_id
         self.result = result.init_from_scanner(url)
         self._extractors = []
-        self.page = Page(int(time.time()))
+        self.page = Page()
 
     async def _init_queue(self):
         self._queue = janus.Queue()
@@ -94,8 +95,7 @@ class InteractiveScanner(Thread):
                 # send poison pill
                 return True
             case unknown_command:
-                raise ScannerError(
-                    f"Unknown command '{unknown_command}' ignored.")
+                raise ScannerError(f"Unknown command '{unknown_command}' ignored.")
         return False
 
     # Socket Communication
@@ -137,24 +137,17 @@ class InteractiveScanner(Thread):
         if not self.start_url_netloc == url_parsed.netloc:
             self.logger.info("Site exited or forwarded..")
 
-        intermediate_result = {"url": url,
-                               "event": reason,
-                               "timestamp": self.page.scan_time,
-                               "screenshots": self.page.screenshots,
-                               }
+        intermediate_result = {"url": url, "event": reason, "timestamp": self.page.scan_time,
+                               "screenshots": self.page.screenshots, "user_interaction": self.page.user_interaction}
         self._extractors.clear()
         for extractor_class in EXTRACTOR_CLASSES:
-            self._extractors.append(extractor_class(
-                self.browser,
-                self.page,
-                self.options
-            ))
+            self._extractors.append(extractor_class(self.browser, self.page, self.options))
 
         for extractor in self._extractors:
             extractor_info = await extractor.extract_information()
             # append result
             intermediate_result = intermediate_result | extractor_info.copy()
-        self.page = Page(int(time.time()))
+        self.page = Page()
         self.result["interaction"].append(intermediate_result.copy())
 
     async def _register_interaction(self):
@@ -195,6 +188,14 @@ class InteractiveScanner(Thread):
         if frame.url != 'about:blank':
             self.send_socket_msg({"URLChanged": frame.url})
 
+    async def _console_msg_received(self, console_message):
+        msg_text = console_message.text
+        if msg_text.startswith(SCANNER_KEY):
+            interaction_json = json.loads(msg_text[len(SCANNER_KEY):])
+            self.page.add_interaction(interaction_json)
+        else:
+            pass  # ignore other messages
+
     # Callback Definition
 
     async def _register_callbacks(self):
@@ -212,17 +213,17 @@ class InteractiveScanner(Thread):
         self.browser.register_page_event("request", self._request_sent)
         self.browser.register_page_event("response", self._response_received)
         self.browser.register_page_event("framenavigated", self._frame_navigated)
-        # self.browser.register_event("BackgroundService.backgroundServiceEventReceived",
-        #                            self._backgroundServiceEventReceived)
+        self.browser.register_page_event("console", self._console_msg_received)
 
 
 class Page:
-    def __init__(self, scan_time):
-        self.scan_time = scan_time
+    def __init__(self):
+        self.scan_time = int(time.time())
         self.request_log = []
         self.failed_request_log = []
         self.response_log = []
         self.screenshots = []
+        self.user_interaction = []
 
     def add_request(self, request):
         self.request_log.append(request)
@@ -232,11 +233,11 @@ class Page:
 
     def add_response(self, response):
         self.response_log.append(response)
-        # for r in self.request_log:
-        #    if r['id'] == requestId:
-        #        if not r['responses']:
-        #            r['responses'] = list()
-        #        r['responses'].append(response)
+
+        # for r in self.request_log:  #    if r['id'] == requestId:  #        if not r['responses']:  #            r['responses'] = list()  #        r['responses'].append(response)
 
     def add_screenshot_path(self, path):
         self.screenshots.append(str(path))
+
+    def add_interaction(self, interaction):
+        self.user_interaction.append(interaction)

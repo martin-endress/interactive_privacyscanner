@@ -7,6 +7,7 @@ import logs
 logger = logs.get_logger('chrome_api')
 
 SCREENSHOT_QUALITY = 80
+INIT_JS_PATH = "https://cdn.jsdelivr.net/gh/martin-endress/interactive_privacyscanner@record-interaction/manager/tmp/init.js"
 
 
 class Browser:
@@ -25,12 +26,14 @@ class Browser:
 
         # Create Context (like incognito session)
         har_path = self.files_path / 'network.har'
-        self._context = await self._browser.new_context(accept_downloads=False,
-                                                        record_har_path=har_path,
+        self._context = await self._browser.new_context(accept_downloads=False, record_har_path=har_path,
                                                         record_har_omit_content=True)
 
         # Create Tab
         self._page = await self._context.new_page()
+
+        # Set init script for JS debug capabilities (see #22)
+        await self._page.add_init_script(path="tmp/init.js")
 
         # CDP session
         self._cdp_session = await self._context.new_cdp_session(self._page)
@@ -50,7 +53,7 @@ class Browser:
     async def set_dom_breakpoints(self):
         setEventBreakpoint = "DOMDebugger.setEventListenerBreakpoint"
         params = {"eventName": "click"}
-        await self._cdp_session.send(setEventBreakpoint, params)
+        # await self._cdp_session.send(setEventBreakpoint, params)
         self._cdp_session.on('Debugger.paused', debugger_paused)
 
     async def cpd_send_message(self, msg, **params):
@@ -81,5 +84,4 @@ class Browser:
 
 
 def debugger_paused(*args):
-    logger.info(f"Debugger paused. Reason: args: {str(args)}.")
-    # self.cpd_send_message('Debugger.resume')
+    logger.info(f"Debugger paused. Reason: args: {str(args)}.")  # self.cpd_send_message('Debugger.resume')

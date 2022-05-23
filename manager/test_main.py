@@ -32,34 +32,36 @@ interaction_log = list()
 async def main2():
     async with async_playwright() as playwright:
         chromium = playwright.chromium
-        browser = await chromium.launch(headless=False)
-        context = await browser.new_context()
+        #browser = await chromium.launch(headless=False)
+        #context = await browser.new_context()
 
         # create page
-        page = await context.new_page()
-        await page.add_init_script(path="tmp/init.js")
-        page.on("console", on_console)
+        #page = await context.new_page()
+        #await page.add_init_script(path="tmp/init.js")
+        #page.on("console", on_console)
 
         # navigate
-        await page.goto("http://example.com/")
-
-        await asyncio.sleep(15)
-        await browser.close()
+        #await page.goto("http://example.com/")
+#
+        #await asyncio.sleep(15)
+        #await browser.close()
 
         # replay interaction
         browser = await chromium.launch(headless=False)
         context = await browser.new_context()
-
+        interaction_log = [
+            'html > body > div > #notice > div:nth-child(2) > div > div:nth-child(3) > button:nth-child(2)',
+            'html > body > div:nth-child(8) > div > div > div:nth-child(3) > div:nth-child(1) > div:nth-child(2) > ul > li:nth-child(1) > h2 > a > span:nth-child(3)']
         # create page
         page = await context.new_page()
         await page.add_init_script(path="tmp/init.js")
 
         # navigate
-        await page.goto("http://example.com/")
+        await page.goto("http://tagesspiegel.de/")
         try:
             for interaction in interaction_log:
                 await asyncio.sleep(3)
-                selector = interaction['selector']
+                selector = interaction#['selector']
                 print(f'Attempting to replay {selector} event.')
                 locator = page.locator(selector)
                 await locator.click()
