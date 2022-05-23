@@ -1,17 +1,16 @@
-console.log('a')
-import {RobulaPlus} from 'https://raw.githubusercontent.com/martin-endress/interactive_privacyscanner/record-interaction/manager/tmp/index.min.js';
-console.log('b')
+//console.log('a')
+//import {RobulaPlus} from 'https://cdn.jsdelivr.net/gh/martin-endress/interactive_privacyscanner@record-interaction/manager/tmp/index.min.js';
+//console.log('b')
 
 function sendMsg(msg) {
     console.log('SCANNER' + msg);
 }
-sendMsg('import worked');
 
 function interaction(event, selector) {
     sendMsg(selector);
 }
 
-const ROBULA = RobulaPlus()
+//const ROBULA = RobulaPlus()
 
 /*
 CSS Selector
@@ -30,7 +29,7 @@ function getCssSelector(el) {
 // Event Handlers
 function clickHandler(event) {
     interaction('', getCssSelector(event.target));
-    sendMsg(ROBULA.getRobustXPath(event.target, document));
+    //sendMsg(ROBULA.getRobustXPath(event.target, document));
 }
 
 // Register Event Handler
