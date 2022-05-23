@@ -10,7 +10,7 @@ function interaction(event, selector) {
     sendMsg(selector);
 }
 
-//const ROBULA = RobulaPlus()
+// const ROBULA = new RobulaPlus();
 
 /*
 CSS Selector
@@ -24,6 +24,16 @@ function getCssSelector(el) {
         el = parent;
     }
     return `${path.join(' > ')}`.toLowerCase();
+}
+
+function isInShadow(el) {
+    while (parent = el.parentNode) {
+        if (el.toString() === "[object ShadowRoot]") {
+            return true;
+        }
+        el = parent;
+    }
+    return false;
 }
 
 // Event Handlers

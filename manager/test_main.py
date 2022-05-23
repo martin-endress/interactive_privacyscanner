@@ -34,30 +34,56 @@ async def main2():
         chromium = playwright.chromium
         browser = await chromium.launch(headless=False)
         context = await browser.new_context()
-        #await context.add_init_script(path="tmp/init.js")
 
         # create page
         page = await context.new_page()
+        await page.add_init_script(path="tmp/init.js")
         page.on("console", on_console)
 
         # navigate
-        await page.goto("http://example.com")
-        await page.add_script_tag(path="tmp/init.js")#, type='module')
+        await page.goto("http://heise.de/")
+        # await page.add_script_tag(path="tmp/init.js", type='module')
 
-        # end on input
-        await asyncio.sleep(10000)
+        await asyncio.sleep(2)
+        l = page.locator('button:has-text("Zustimmen")')
+        print(await l.count())
+
+        await asyncio.sleep(1500)
+        recording = False
+        await browser.close()
 
         # replay interaction
+        browser = await chromium.launch(headless=False)
         context = await browser.new_context()
-        # await context.add_init_script(path="tmp/init.js", type='module')
+
+        # create page
         page = await context.new_page()
-        page.on("console", on_console)
-        await page.goto("http://example.com")
-        await page.add_script_tag(path="tmp/init.js", type='module')
+        await page.add_init_script(path="tmp/init.js")
 
-        await asyncio.sleep(10)
+        # navigate
+        await page.goto("http://heise.de/")
 
-        # for i in interaction:  #    print(f'Attempting to replay {i}.')  #    locator = page.locator(i)  #    for _ in range(5):  #        print('attempt')  #        print(await locator.count())  #        await asyncio.sleep(2)
+        for i in interaction:
+            found = False
+            print(f'Attempting to replay {i}.')
+            locator = page.locator(i)
+            await asyncio.sleep(5)
+            attempts = 5
+            for i in range(attempts):
+                print(f'Attempt {i + 1} of {attempts}')
+                num_locators = await locator.count()
+                print(f'num locators: {num_locators}')
+                if num_locators == 1:
+                    print('locator found, clicking link')
+                    await locator.click()
+                    found = True
+                    break
+                await asyncio.sleep(5)
+            if not found:
+                print('error')
+                break
+        await asyncio.sleep(3)
+        await browser.close()
 
 
 #        await asyncio.sleep(3)
