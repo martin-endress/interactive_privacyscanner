@@ -202,6 +202,9 @@ scanUpdateFromDict ( k, v ) =
         "URLChanged" ->
             Just (URLChanged v)
 
+        "SocketError" ->
+            Just (SocketError v)
+
         "Log" ->
             Just (Log v)
 

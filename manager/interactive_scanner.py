@@ -185,8 +185,12 @@ class InteractiveScanner(Thread):
         self.page.add_response(response)
 
     async def _frame_navigated(self, frame):
-        if frame.url != 'about:blank':
-            self.send_socket_msg({"URLChanged": frame.url})
+        logger.debug(f"Frame navigated. (type: {frame['type']})")
+        frame = frame['frame']
+        if frame['url'] != 'about:blank':
+            url = urlparse(frame['url'])
+            url_str = f"{url.scheme}://{url.netloc}/..."
+            self.send_socket_msg({"URLChanged": url_str})
 
     async def _console_msg_received(self, console_message):
         msg_text = console_message.text
