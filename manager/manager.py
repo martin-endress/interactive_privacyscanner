@@ -131,7 +131,7 @@ def addSocket(socket):
         container_id = socket.receive()
         if container_id in scanners:
             scanners[container_id].set_socket(socket)
-            logger.info("Scanner updated successfully.")
+            logger.info("Scanner socket info updated successfully.")
 
 
 @app.route('/status', methods=['GET'])

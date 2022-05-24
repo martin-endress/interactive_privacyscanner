@@ -40,8 +40,8 @@
 
         // Disconnect on close
         window.onunload = function () {
-            // TODO wire this up with ELM
             guac.disconnect();
+            socket.close();
         }
 
         // Mouse and keyboard events on focus / unfocus
