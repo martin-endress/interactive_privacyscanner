@@ -82,6 +82,9 @@ class Browser:
     async def ignore_inputs(self, ignore):
         await self.cpd_send_message('Input.setIgnoreInputEvents', ignore=ignore)
 
+    async def perform_user_interaction(self, interaction):
+        await interaction.perform()
+
 
 def debugger_paused(*args):
     logger.info(f"Debugger paused. Reason: args: {str(args)}.")  # self.cpd_send_message('Debugger.resume')

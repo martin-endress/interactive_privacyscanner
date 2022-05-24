@@ -64,7 +64,7 @@ def run_container():
         raise PodmanError('Container is not running.')
 
     logger.info("Started new container instance. (container id=%s)" % container.id)
-    ports = __get_host_ports(container)
+    ports = _get_host_ports(container)
     if VNC_PORT not in ports or DEVTOOLS_PORT not in ports:
         raise PodmanError("Container port mapping invalid. (status=%s)" % container.status)
 
@@ -94,7 +94,7 @@ def podman_available():
         return False
 
 
-def __get_host_ports(container):
+def _get_host_ports(container):
     ports = dict()
     for port, port_info in container.ports.items():
         port = int(port[:-len("/tcp")])
