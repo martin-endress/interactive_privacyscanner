@@ -1,24 +1,28 @@
 module Main exposing (main)
 
 import Browser
-import Html exposing (Html, text)
-import Route exposing (Route)
+import Html exposing (Html)
+import Ports
+import Replay.Page as ReplayPage
+import Route exposing (Route(..))
 import Scan.Page as ScanPage
 
 
 type alias Model =
     { page : Page
-    , currentRoute : Maybe Route
+    , route : Route
     }
 
 
 type Msg
-    = ScanPageMsg ScanPage.Msg
+    = ChangedUrl String
+    | ScanPageMsg ScanPage.Msg
+    | ReplayPageMsg ReplayPage.Msg
 
 
 type Page
-    = Blank
-    | ScanPage ScanPage.Model
+    = ScanPage ScanPage.Model
+    | ReplayPage ReplayPage.Model
 
 
 
@@ -46,12 +50,8 @@ init _ =
 
 initModel : Model
 initModel =
-    let
-        scanModel =
-            ScanPage.init
-    in
-    { page = ScanPage scanModel
-    , currentRoute = Just Route.Status
+    { page = ScanPage ScanPage.init
+    , route = Scanner
     }
 
 
@@ -67,12 +67,12 @@ view model =
 viewPage : Model -> Html Msg
 viewPage model =
     case model.page of
-        Blank ->
-            text ""
-
         ScanPage subModel ->
             ScanPage.view subModel
                 |> Html.map ScanPageMsg
+
+        ReplayPage subModel ->
+            ReplayPage.view subModel |> Html.map ReplayPageMsg
 
 
 
@@ -98,11 +98,44 @@ updatePage msg model =
             ( { model | page = toModel newModel }, Cmd.map toMsg newCmd )
     in
     case ( page, msg ) of
-        ( Blank, _ ) ->
-            ( model, Cmd.none )
+        ( _, ChangedUrl url ) ->
+            setRoute (Route.toRoute url) model
 
         ( ScanPage subModel, ScanPageMsg subMsg ) ->
             toPage ScanPage ScanPageMsg ScanPage.update subMsg subModel
+
+        ( ReplayPage subModel, ReplayPageMsg subMsg ) ->
+            toPage ReplayPage ReplayPageMsg ReplayPage.update subMsg subModel
+
+        bad_state ->
+            let
+                _ =
+                    Debug.log "Error in updatePage. Unexpected Update message received." bad_state
+            in
+            ( model, Cmd.none )
+
+
+setRoute : Route -> Model -> ( Model, Cmd Msg )
+setRoute route model =
+    let
+        newModel =
+            { model | route = route }
+    in
+    case route of
+        NotFound ->
+            ( newModel
+            , Cmd.none
+            )
+
+        Scanner ->
+            ( { newModel | page = ScanPage ScanPage.init }
+            , Cmd.none
+            )
+
+        Replay ->
+            ( { model | page = ReplayPage ReplayPage.init }
+            , Cmd.none
+            )
 
 
 
@@ -111,4 +144,5 @@ updatePage msg model =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.map ScanPageMsg ScanPage.messageSubscription
+    Sub.batch
+        [ Sub.map ScanPageMsg ScanPage.messageSubscription, Ports.onUrlChange ChangedUrl ]

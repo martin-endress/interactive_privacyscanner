@@ -92,6 +92,13 @@
             connectWebsocket(connection);
         });
 
+        // Change the URL upon request, inform app of the change.
+        app.ports.pushUrl.subscribe(function (url) {
+            window.location.hash = url;
+            history.pushState({}, '', url);
+            app.ports.onUrlChange.send(location.href);
+        });
+
         function connectGuacamole(connection) {
             param = "port=" + connection.vncPort.toString()
             guac.connect(param);
