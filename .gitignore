@@ -6,7 +6,7 @@ bin/
 /guacamole_backend/target/
 
 ### Elm ###
-frontend/elm.js
+frontend/target/elm.js
 # elm-package generated files
 elm-stuff
 # elm-repl generated files
