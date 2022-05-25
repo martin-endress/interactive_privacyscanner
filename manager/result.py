@@ -22,7 +22,7 @@ RESULT_PATH = "results"
 logger = logs.get_logger('results')
 
 
-class Result(object):
+class Result:
     """
     see https://github.com/PrivacyScore/privacyscanner/blob/master/privacyscanner/result.py
     """
@@ -130,6 +130,22 @@ class Result(object):
                 "Could not write result JSON: {}".format(e)) from e
 
 
+def get_first_result(result_id, key_filter):
+    result_path = (Path("results") / result_id / FIRST_SCAN / RESULT_FILENAME).resolve()
+    if not result_path.exists() or result_path.is_dir():
+        raise ScannerError(f"Result file {str(result_path)} does not exist.")
+    with open(result_path) as f:
+        first_result = json.load(f)
+        return filter_dict(first_result, key_filter)
+
+
+def filter_interaction(d, interaction_keys):
+    pass
+
+def filter_dict(d, keys):
+    return {k: d[k] for k in d.keys() & keys}
+
+
 def get_result_id(netloc):
     now = datetime.now().strftime("%y-%m-%d_%H-%M")
     return "%s_%s" % (utils.slugify(netloc), now)
@@ -148,10 +164,3 @@ async def parse_response(response):
             "headers": await response.all_headers(),
             "status": response.status,
             "security": await response.security_details()}
-
-
-def get_result_dict(id, shorten=False):
-    result_path = (Path("results") / id).resolve()
-    if not result_path.exists() or not result_path.is_dir():
-        raise ScannerError(f"Result folder {str(result_path)} does not exist.")
-    json_path = result_path / "result.json"

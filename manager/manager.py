@@ -7,7 +7,7 @@ from flask_sock import Sock
 from podman.errors import PodmanError
 
 import logs
-import result
+from result import get_first_result
 from interactive_scanner import InteractiveScanner
 from podman_container import run_container, podman_available, stop_container
 from scanner_messages import ScannerMessage, MessageType
@@ -166,7 +166,8 @@ def replay_scan():
     if request.json is None:
         return Response('Client Error: Request must be a JSON', status=400)
     result_id = request.json['result_id']
-
+    keys = ['site_url']
+    result = get_first_result(result_id, )
     scan_info = result.get_result_dict(result_id, True)
 
     # Start container
