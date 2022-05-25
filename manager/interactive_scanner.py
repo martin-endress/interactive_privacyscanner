@@ -12,7 +12,7 @@ import result
 from browser import Browser
 from errors import ScannerInitError, ScannerError
 from extractors import CookiesExtractor, RequestsExtractor, ResponsesExtractor
-from result import Result
+from result import Result, ResultKey
 from scanner_messages import ScannerMessage, MessageType
 
 EXTRACTOR_CLASSES = [CookiesExtractor, RequestsExtractor, ResponsesExtractor]
@@ -22,7 +22,7 @@ logger = logs.get_logger('scanner')
 
 
 class InteractiveScanner(Thread):
-    def __init__(self, url, debugging_port, container_id, options, initial_scan):
+    def __init__(self, url, debugging_port, container_id, options, reference_scan_id=None):
         super().__init__()
         # Mark this thread as daemon
         self.daemon = True
@@ -40,8 +40,8 @@ class InteractiveScanner(Thread):
         # Init Scanner
         self.url = url
         self.start_url_netloc = urlparse(url).netloc
-        self.initial_scan = initial_scan
-        self.result = self._init_result()
+        self.initial_scan = reference_scan_id is None
+        self.result = self._init_result() if self.initial_scan else self._load_result(reference_scan_id)
         self.debugging_port = debugging_port
         self.container_id = container_id
         self.options = options
@@ -52,9 +52,13 @@ class InteractiveScanner(Thread):
         site_parsed = urlparse(self.url)
         if site_parsed.scheme not in ("http", "https"):
             raise ScannerInitError("Invalid site url: {}".format(self.url))
-        result_json = {"site_url": self.url, "interaction": []}
+        result_json = {ResultKey.SITE_URL: self.url, ResultKey.INTERACTION: []}
         result_id = result.get_result_id(site_parsed.netloc)
         return Result(result_json, result_id, self.initial_scan)
+
+    def _load_result(self, reference_scan_id):
+        result_json = {ResultKey.SITE_URL: self.url, ResultKey.INTERACTION: []}
+        return Result(result_json, reference_scan_id, self.initial_scan)
 
     async def _init_queue(self):
         self._queue = janus.Queue()
@@ -84,8 +88,11 @@ class InteractiveScanner(Thread):
                         self.logger.info('Scan complete, terminating thread.')
                         break
                 except ScannerError as e:
-                    self.logger.error(str(e))
-                    continue
+                    error_msg = str(e)
+                    self.logger.error(error_msg)
+                    self.result[ResultKey.ERROR] = error_msg
+                    self.result.store_result()
+                    break
         # Stop container after disconnecting from browser
         podman_container.stop_container(self.container_id)
         self.send_socket_msg({"ScanComplete": ""})
@@ -134,7 +141,7 @@ class InteractiveScanner(Thread):
         await self._register_callbacks()
         await self.browser.ignore_inputs(True)
         await self._navigate_to_page()
-        await self._record_information(result.INITIAL_SCAN)
+        await self._record_information(ResultKey.INITIAL_SCAN)
         await self.browser.ignore_inputs(False)
         self.send_socket_msg({"ScanComplete": ""})
 
@@ -150,8 +157,9 @@ class InteractiveScanner(Thread):
         if not self.start_url_netloc == url_parsed.netloc:
             self.logger.info("Site exited or forwarded..")
 
-        intermediate_result = {"url": url, "event": reason, "timestamp": self._page.scan_time,
-                               "screenshots": self._page.screenshots, "user_interaction": self._page.user_interaction}
+        intermediate_result = {ResultKey.URL: url, ResultKey.EVENT: reason, ResultKey.TIMESTAMP: self._page.scan_time,
+                               ResultKey.SCREENSHOTS: self._page.screenshots,
+                               ResultKey.USER_INTERACTION: self._page.user_interaction}
         self._extractors.clear()
         for extractor_class in EXTRACTOR_CLASSES:
             self._extractors.append(extractor_class(self.browser, self._page, self.options))
@@ -161,7 +169,7 @@ class InteractiveScanner(Thread):
             # append result
             intermediate_result = intermediate_result | extractor_info.copy()
         self._page = Page()
-        self.result["interaction"].append(intermediate_result.copy())
+        self.result[ResultKey.INTERACTION].append(intermediate_result.copy())
 
     async def _perform_user_interaction(self, user_interaction):
         if self.initial_scan:
@@ -171,13 +179,13 @@ class InteractiveScanner(Thread):
 
     async def _register_interaction(self):
         await self.browser.ignore_inputs(True)
-        await self._record_information(result.MANUAL_INTERACTION)
+        await self._record_information(ResultKey.MANUAL_INTERACTION)
         await self.browser.ignore_inputs(False)
         self.send_socket_msg({"ScanComplete": ""})
 
     async def _clear_cookies(self):
         await self.browser.ignore_inputs(True)
-        await self._record_information(result.DELETE_COOKIES)
+        await self._record_information(ResultKey.DELETE_COOKIES)
         await self.browser.clear_cookies()
         await self.browser.ignore_inputs(False)
         self.send_socket_msg({"ScanComplete": ""})
@@ -192,7 +200,7 @@ class InteractiveScanner(Thread):
 
     async def _stop_scan(self):
         await self.browser.ignore_inputs(True)
-        await self._record_information(result.END_SCAN)
+        await self._record_information(ResultKey.END_SCAN)
         self.result.store_result()
 
     # Callback Functions

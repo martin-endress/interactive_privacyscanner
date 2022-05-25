@@ -1,8 +1,10 @@
 import asyncio
 
+import playwright.async_api as async_api
 from playwright.async_api import async_playwright
 
 import logs
+from errors import ScannerError
 
 logger = logs.get_logger('chrome_api')
 
@@ -83,7 +85,17 @@ class Browser:
         await self.cpd_send_message('Input.setIgnoreInputEvents', ignore=ignore)
 
     async def perform_user_interaction(self, interaction):
-        await interaction.perform()
+        # user interaction event is defined through 'event' and 'selector'
+        event = interaction['event']
+        selector = interaction['selector']
+        match event:
+            case 'click':
+                try:
+                    await self._page.click(selector, timeout=10 * 1000)  # 10 seconds
+                except async_api.TimeoutError as e:
+                    raise ScannerError(f"Locator not found, scan aborted ({e}).") from e
+            case default:
+                raise ScannerError(f"Unknown event '{default}', scan aborted.")
 
 
 def debugger_paused(*args):

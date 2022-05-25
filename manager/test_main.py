@@ -1,5 +1,3 @@
-import time
-
 import requests
 
 
@@ -8,20 +6,11 @@ def main():
 
     url = "http://www.example.com/"
 
-    response = requests.post(manager_url + "start_scan", json={"url": url}).json()
+    response = requests.post(manager_url + "replay_scan", json={"result_id": "heise.de_22-05-25_14-24"})
     print(response)
-    vnc_port = response['vnc_port']
-    container_id = response['container_id']
-    print('Container started. vnc port: %s, container id: %s' % (vnc_port, container_id))
-
-    time.sleep(5)
-
-    print('Sutting down container')
-
-    response = requests.post(manager_url + "stop_scan", json={"container_id": container_id})
-    if response.status_code != 200:
-        print('error')
-        print(response)
+    vnc_port = response.json()['vnc_port']
+    # container_id = response['container_id']
+    print(f'Container started. vnc port: {vnc_port}')
 
 
 if __name__ == "__main__":

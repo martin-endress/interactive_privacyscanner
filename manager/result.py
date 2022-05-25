@@ -7,16 +7,33 @@ import utils
 from errors import ScannerInitError, ScannerError
 from utils import DirectoryFileHandler
 
-INITIAL_SCAN = 'initial scan'
-MANUAL_INTERACTION = 'manual interaction'
-DELETE_COOKIES = 'delete cookies'
-END_SCAN = 'end scan'
 
+class ResultKey:
+    # interaction types
+    INITIAL_SCAN = 'initial scan'
+    MANUAL_INTERACTION = 'manual interaction'
+    DELETE_COOKIES = 'delete cookies'
+    END_SCAN = 'end scan'
+
+    # interaction
+    INTERACTION = 'interaction'
+
+    # interaction entries
+    SITE_URL = 'site url'
+    URL = 'url'
+    EVENT = 'event'
+    TIMESTAMP = 'timestamp'
+    SCREENSHOTS = 'screenshots'
+    USER_INTERACTION = 'user interaction'
+    ERROR = 'error'
+
+
+# filename format
 FIRST_SCAN = 'first_scan'
 RECORDED_SCAN_PREFIX = 'recorded_scan_'
 
+# file / folder names
 RESULT_FILENAME = 'result.json'
-
 RESULT_PATH = "results"
 
 logger = logs.get_logger('results')
@@ -124,23 +141,31 @@ class Result:
             with result_file.open("w") as f:
                 json.dump(self._result_dict, f, indent=2, sort_keys=True)
                 f.write("\n")
-                logger.debug(json.dumps(self._result_dict, indent=1, sort_keys=True))
         except IOError as e:
-            raise ScannerInitError(
-                "Could not write result JSON: {}".format(e)) from e
+            raise ScannerInitError("Could not write result JSON: {}".format(e)) from e
 
 
-def get_first_result(result_id, key_filter):
+def get_scan_info(result_id):
+    """
+    Returns the filtered result of the first scan.
+    :param result_id: result id referencing the result root folder
+    :return: result json containing urls, events and user interaction of the first scan
+    """
     result_path = (Path("results") / result_id / FIRST_SCAN / RESULT_FILENAME).resolve()
     if not result_path.exists() or result_path.is_dir():
         raise ScannerError(f"Result file {str(result_path)} does not exist.")
     with open(result_path) as f:
         first_result = json.load(f)
-        return filter_dict(first_result, key_filter)
+        interaction_filtered = list(map(filter_entry, first_result[ResultKey.INTERACTION]))
+        return {ResultKey.SITE_URL: first_result[ResultKey.SITE_URL], ResultKey.INTERACTION: interaction_filtered}
 
 
-def filter_interaction(d, interaction_keys):
-    pass
+def filter_entry(e):
+    interaction_filter = [ResultKey.URL,
+                          ResultKey.EVENT,
+                          ResultKey.USER_INTERACTION]
+    return filter_dict(e, interaction_filter)
+
 
 def filter_dict(d, keys):
     return {k: d[k] for k in d.keys() & keys}
