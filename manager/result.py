@@ -160,6 +160,17 @@ def get_scan_info(result_id):
         return {ResultKey.SITE_URL: first_result[ResultKey.SITE_URL], ResultKey.INTERACTION: interaction_filtered}
 
 
+def get_all_scans():
+    scans = []
+    scan_path = Path(RESULT_PATH)
+    for p in scan_path.iterdir():
+        if not p.is_dir():
+            continue
+        replay_count = sum(1 for x in p.iterdir()) - 1
+        scans.append({'id': str(p), 'replay_count': replay_count})
+    return scans
+
+
 def filter_entry(e):
     interaction_filter = [ResultKey.URL,
                           ResultKey.EVENT,

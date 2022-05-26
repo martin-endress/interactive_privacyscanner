@@ -164,7 +164,9 @@ def stop_all_scans():
 
 @app.route('/get_all_scans', methods=['GET'])
 def get_all_scans():
-    pass # todo
+    scans = result.get_all_scans()
+    response_body = json.dumps(scans)
+    return Response(response_body, status=200)
 
 
 @app.route('/replay_scan', methods=['POST'])
