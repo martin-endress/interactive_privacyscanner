@@ -1,7 +1,12 @@
 module Replay.Page exposing (..)
 
-import Html exposing (Html, div, text)
+import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (class)
+import Html.Events exposing (onClick)
+import Http exposing (Metadata)
+import Http.Detailed exposing (Error)
+import Replay.Data exposing (ScansInfo)
+import Replay.Requests as Requests
 
 
 
@@ -9,12 +14,13 @@ import Html.Attributes exposing (class)
 
 
 type alias Model =
-    { scans : List String
+    { scans : ScansInfo
     }
 
 
 type Msg
-    = Empty
+    = ScansInfo
+    | GotScansInfo (Result (Error String) ( Metadata, ScansInfo ))
 
 
 
@@ -33,7 +39,23 @@ init =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    ( model, Cmd.none )
+    case msg of
+        ScansInfo ->
+            ( model, Requests.getAllScans GotScansInfo )
+
+        GotScansInfo scansInfo ->
+            case scansInfo of
+                Ok ( _, info ) ->
+                    ( { model | scans = info }
+                    , Cmd.none
+                    )
+
+                Err m ->
+                    let
+                        _ =
+                            Debug.log "Could not retrieve scans." m
+                    in
+                    ( model, Cmd.none )
 
 
 
@@ -45,6 +67,14 @@ view model =
     div
         [ class "container-fluid" ]
         [ div [ class "row", class "justify-content-center" ]
-            [ text "asdf"
+            [ text <| "#Scans:" ++ String.fromInt (List.length model.scans)
+            , button
+                [ class "btn"
+                , class "btn-secondary"
+                , class "col"
+                , class "m-1"
+                , onClick ScansInfo
+                ]
+                [ text "Update List" ]
             ]
         ]

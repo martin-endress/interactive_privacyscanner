@@ -162,6 +162,11 @@ def stop_all_scans():
     return Response('Shutdown successful.', status=200)
 
 
+@app.route('/get_all_scans', methods=['GET'])
+def get_all_scans():
+    pass # todo
+
+
 @app.route('/replay_scan', methods=['POST'])
 def replay_scan():
     # Get Scan Info
