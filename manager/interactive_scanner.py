@@ -226,6 +226,7 @@ class InteractiveScanner(Thread):
             interaction_json = json.loads(msg_text[len(SCANNER_KEY):])
             self._page.add_interaction(interaction_json)
         else:
+            logger.debug('console message: ' + msg_text)
             pass  # ignore other messages
 
     # Callback Definition
