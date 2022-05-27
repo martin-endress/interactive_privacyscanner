@@ -35,7 +35,7 @@ class Browser:
         self._page = await self._context.new_page()
 
         # Set init script for JS debug capabilities (see #22)
-        await self._page.add_init_script(path="tmp/init.js")
+        await self._page.add_init_script(path="tmp/init2.js")
 
         # CDP session
         self._cdp_session = await self._context.new_cdp_session(self._page)

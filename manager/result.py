@@ -160,22 +160,35 @@ def get_scan_info(result_id):
         return {ResultKey.SITE_URL: first_result[ResultKey.SITE_URL], ResultKey.INTERACTION: interaction_filtered}
 
 
-def get_all_scans():
-    scans = []
-    scan_path = Path(RESULT_PATH)
-    for p in scan_path.iterdir():
-        if not p.is_dir():
-            continue
-        replay_count = sum(1 for x in p.iterdir()) - 1
-        scans.append({'id': str(p), 'replay_count': replay_count})
-    return scans
-
-
 def filter_entry(e):
     interaction_filter = [ResultKey.URL,
                           ResultKey.EVENT,
                           ResultKey.USER_INTERACTION]
     return filter_dict(e, interaction_filter)
+
+
+def get_all_scans():
+    scans = []
+    scan_path = Path(RESULT_PATH)
+    for p in scan_path.iterdir():
+        current_scan = {'id': p.name, 'replays': []}
+        if not p.is_dir():
+            continue
+        for scan in p.iterdir():
+            logger.debug(scan)
+            success = scan_successful(scan)
+            if scan.name == FIRST_SCAN:
+                current_scan['initial'] = {'success': success}
+            else:
+                current_scan['replays'].append({'success': success})
+        scans.append(current_scan)
+    return scans
+
+
+def scan_successful(path):
+    with open(path / RESULT_FILENAME) as f:
+        r = json.load(f)
+        return not (ResultKey.ERROR in r)
 
 
 def filter_dict(d, keys):
