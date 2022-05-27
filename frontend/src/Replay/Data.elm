@@ -1,21 +1,44 @@
-module Replay.Data exposing (Scan, ScansInfo,scansDecoder)
+module Replay.Data exposing (ScanInfo, scansDecoder)
 
 import Json.Decode as D exposing (Decoder)
 
 
-type alias ScansInfo =
-    List Scan
-
-
-type alias Scan =
+type alias ScanInfo =
     { id : String
-    , replayCount : Int
+    , initialScan : InitialScanInfo
+    , replays : List ScanReplayInfo
     }
 
 
-scansDecoder : Decoder ScansInfo
+type alias InitialScanInfo =
+    { success : Bool
+    }
+
+
+type alias ScanReplayInfo =
+    { success : Bool
+    }
+
+
+scansDecoder : Decoder (List ScanInfo)
 scansDecoder =
-    D.map2 Scan
+    D.map3 ScanInfo
         (D.field "id" D.string)
-        (D.field "replay_count" D.int)
+        (D.field "initial" initialScanDecoder)
+        (D.field "replays" replayScanDecoder)
+        |> D.list
+
+
+initialScanDecoder : Decoder InitialScanInfo
+initialScanDecoder =
+    D.map
+        ScanReplayInfo
+        (D.field "success" D.bool)
+
+
+replayScanDecoder : Decoder (List ScanReplayInfo)
+replayScanDecoder =
+    D.map
+        ScanReplayInfo
+        (D.field "success" D.bool)
         |> D.list

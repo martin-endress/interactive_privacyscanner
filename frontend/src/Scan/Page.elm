@@ -300,6 +300,8 @@ viewStatusPanel model =
         , class "p-0"
         , class "bg-light"
         , class "vh-100"
+        , class "d-flex"
+        , class "flex-column"
         ]
         [ h4 [ class "m-3", class "text-center" ] [ text "Interactive Privacyscanner" ]
         , viewStartInput model
@@ -308,6 +310,20 @@ viewStatusPanel model =
         , View.viewDescriptionText "Interactions" <| String.fromInt model.interactionCount
         , viewButtons (model.scanState == AwaitingInteraction)
         , View.viewLog model.log
+        , div [ class "row", class "justify-content-center", class "flex-grow-1" ] []
+        , div [ class "container", class "m-1" ]
+            [ div
+                [ class "row" ]
+                [ button
+                    [ class "btn"
+                    , class "btn-success"
+                    , class "m-1"
+                    , class "col"
+                    , onClick ViewReplay
+                    ]
+                    [ text "View Results" ]
+                ]
+            ]
         ]
 
 
@@ -381,17 +397,6 @@ viewButtons awaitingInteraction =
                 , disabled <| not awaitingInteraction
                 ]
                 [ text "Finish Scan" ]
-            ]
-        , div
-            [ class "row" ]
-            [ button
-                [ class "btn"
-                , class "btn-success"
-                , class "m-1"
-                , class "col"
-                , onClick ViewReplay
-                ]
-                [ text "View Replay" ]
             ]
         ]
 
