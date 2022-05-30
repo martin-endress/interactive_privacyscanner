@@ -8,7 +8,7 @@ import Url.Parser as Url exposing ((</>), (<?>), Parser, oneOf, s)
 type Route
     = NotFound
     | Scanner
-    | Replay
+    | Results
 
 
 routeToString : Route -> String
@@ -22,8 +22,8 @@ routeToString r =
                 Scanner ->
                     [ "scanner" ]
 
-                Replay ->
-                    [ "replay" ]
+                Results ->
+                    [ "results" ]
     in
     String.join "/" parts
 
@@ -48,5 +48,5 @@ route =
     oneOf
         [ Url.map NotFound (s "err")
         , Url.map Scanner (s "scanner")
-        , Url.map Replay (s "replay")
+        , Url.map Results (s "results")
         ]

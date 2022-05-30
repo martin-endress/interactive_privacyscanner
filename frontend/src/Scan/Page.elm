@@ -49,7 +49,7 @@ type Msg
     | FinishScan
     | TakeScreenshot
     | ClearBrowserCookies
-    | ViewReplay
+    | ViewResults
 
 
 
@@ -149,9 +149,9 @@ update msg model =
                 |> Maybe.withDefault Cmd.none
             )
 
-        ViewReplay ->
+        ViewResults ->
             ( model
-            , Route.modifyUrl Replay
+            , Route.modifyUrl Results
             )
 
 
@@ -319,7 +319,7 @@ viewStatusPanel model =
                     , class "btn-success"
                     , class "m-1"
                     , class "col"
-                    , onClick ViewReplay
+                    , onClick ViewResults
                     ]
                     [ text "View Results" ]
                 ]

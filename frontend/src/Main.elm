@@ -3,7 +3,7 @@ module Main exposing (main)
 import Browser
 import Html exposing (Html)
 import Ports
-import Results.Page as ReplayPage
+import Results.Page as ResultsPage
 import Route exposing (Route(..))
 import Scan.Page as ScanPage
 
@@ -17,12 +17,12 @@ type alias Model =
 type Msg
     = ChangedUrl String
     | ScanPageMsg ScanPage.Msg
-    | ReplayPageMsg ReplayPage.Msg
+    | ResultsPageMsg ResultsPage.Msg
 
 
 type Page
     = ScanPage ScanPage.Model
-    | ReplayPage ReplayPage.Model
+    | ResultsPage ResultsPage.Model
 
 
 
@@ -71,8 +71,8 @@ viewPage model =
             ScanPage.view subModel
                 |> Html.map ScanPageMsg
 
-        ReplayPage subModel ->
-            ReplayPage.view subModel |> Html.map ReplayPageMsg
+        ResultsPage subModel ->
+            ResultsPage.view subModel |> Html.map ResultsPageMsg
 
 
 
@@ -104,8 +104,8 @@ updatePage msg model =
         ( ScanPage subModel, ScanPageMsg subMsg ) ->
             toPage ScanPage ScanPageMsg ScanPage.update subMsg subModel
 
-        ( ReplayPage subModel, ReplayPageMsg subMsg ) ->
-            toPage ReplayPage ReplayPageMsg ReplayPage.update subMsg subModel
+        ( ResultsPage subModel, ResultsPageMsg subMsg ) ->
+            toPage ResultsPage ResultsPageMsg ResultsPage.update subMsg subModel
 
         bad_state ->
             let
@@ -132,8 +132,8 @@ setRoute route model =
             , Cmd.none
             )
 
-        Replay ->
-            ( { model | page = ReplayPage ReplayPage.init }
+        Results ->
+            ( { model | page = ResultsPage ResultsPage.init }
             , Cmd.none
             )
 
