@@ -211,9 +211,13 @@ processScanUpdate scanUpdate model =
                 { msg = "VNC error:" ++ message, level = Data.Error }
                 model
 
-        ( GuacamoleError message, _ ) ->
+        ( GuacamoleMsg message, _ ) ->
+            let
+                _ =
+                    Debug.log "new state:" message
+            in
             appendLogEntry
-                { msg = "Guacamole error:" ++ message, level = Data.Error }
+                { msg = "Guacamole msg:" ++ message, level = Data.Warning }
                 model
 
         ( Log message, _ ) ->

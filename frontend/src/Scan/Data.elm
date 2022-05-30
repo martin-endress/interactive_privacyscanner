@@ -126,7 +126,7 @@ type ScanUpdate
     | ScanComplete
     | SocketError String
     | Log String
-    | GuacamoleError String
+    | GuacamoleMsg String
     | URLChanged String
 
 
@@ -145,8 +145,8 @@ scanUpdateToString update =
         Log _ ->
             "Log"
 
-        GuacamoleError _ ->
-            "GuacamoleError"
+        GuacamoleMsg _ ->
+            "GuacamoleMsg"
 
         URLChanged _ ->
             "URLChanged"
@@ -196,8 +196,8 @@ scanUpdateFromDict ( k, v ) =
         "ScanComplete" ->
             Just ScanComplete
 
-        "GuacamoleError" ->
-            Just (GuacamoleError v)
+        "GuacamoleMsg" ->
+            Just (GuacamoleMsg v)
 
         "URLChanged" ->
             Just (URLChanged v)

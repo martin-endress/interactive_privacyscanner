@@ -12,8 +12,13 @@ display.appendChild(guac.getDisplay().getElement());
 
 // Send port messages
 function sendGuacamoleErrorMsg(msg) {
-    msg_json = { "GuacamoleError": msg }
+    msg_json = { "GuacamoleMsg": msg }
     app.ports.messageReceiver.send(msg_json)
+}
+
+guac.onstatechange = function (state) {
+    const state_msg = 'new state=' + state;
+    sendGuacamoleErrorMsg(state_msg);
 }
 
 // Send errors to Elm port
@@ -26,6 +31,7 @@ guac.onerror = function (error) {
 window.onunload = function () {
     // TODO wire this up with ELM
     guac.disconnect();
+    socket.close();
 }
 
 // Mouse and keyboard events on focus / unfocus
