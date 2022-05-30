@@ -1,14 +1,13 @@
-module Replay.Page exposing (..)
+module Results.Page exposing (..)
 
-import Html exposing ( Html, button, div, h2,  text)
-import Html.Attributes exposing (attribute, class,  id, style, type_)
+import Html exposing (Html, button, div, h2, text)
+import Html.Attributes exposing (attribute, class, id, style, type_)
 import Html.Events exposing (onClick)
 import Http exposing (Metadata)
 import Http.Detailed exposing (Error)
-import Replay.Data exposing (ScanInfo)
-import Replay.Requests as Requests
+import Results.Data exposing (ScanInfo)
+import Results.Requests as Requests
 import Route exposing (Route(..))
-
 
 
 

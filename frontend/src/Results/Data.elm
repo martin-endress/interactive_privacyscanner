@@ -1,4 +1,4 @@
-module Replay.Data exposing (ScanInfo, scansDecoder)
+module Results.Data exposing (ScanInfo, scansDecoder)
 
 import Json.Decode as D exposing (Decoder)
 

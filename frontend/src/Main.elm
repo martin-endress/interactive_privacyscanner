@@ -3,7 +3,7 @@ module Main exposing (main)
 import Browser
 import Html exposing (Html)
 import Ports
-import Replay.Page as ReplayPage
+import Results.Page as ReplayPage
 import Route exposing (Route(..))
 import Scan.Page as ScanPage
 
