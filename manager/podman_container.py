@@ -7,14 +7,29 @@ import logs
 
 CHROME_IMAGE_TAG = "chrome_scan"
 PODMAN_SOCKET_URI = "unix:///run/user/1000/podman/podman.sock"
+XDG_RUNTIME_DIR = 'XDG_RUNTIME_DIR'
+PODMAN_SOCKET_URI_PRE = "unix://"
+PODMAN_SOCKET_URI_POST = "/podman/podman.sock"
 VNC_PORT = 5900
 DEVTOOLS_PORT = 9000
 
+logger = logs.get_logger('podman_api')
+
+def get_podman_socket_uri():
+    xdg_runtime = os.getenv(XDG_RUNTIME_DIR)
+    logger.error(f'xdg={xdg_runtime}')
+    if XDG_RUNTIME_DIR in os.environ:
+        logger.error('happy')
+        xdg_runtime = os.getenv(XDG_RUNTIME_DIR)
+        return PODMAN_SOCKET_URI_PRE + xdg_runtime + PODMAN_SOCKET_URI_PRE
+    else:
+        logger.error(f'resort to default URI {PODMAN_SOCKET_URI}')
+        return PODMAN_SOCKET_URI
+
+
 # libpod rootless service unix domain socket
 # (see https://docs.podman.io/en/latest/markdown/podman-system-service.1.html)
-podman_client = PodmanClient(base_url=PODMAN_SOCKET_URI, version="2.0")
-
-logger = logs.get_logger('podman_api')
+podman_client = PodmanClient(base_url=get_podman_socket_uri(), version="2.0")
 
 
 class Container:
