@@ -1,14 +1,14 @@
 module Replay.Page exposing (..)
 
-import Html exposing (Attribute, Html, button, div, h2, span, text)
-import Html.Attributes exposing (attribute, class, height, id, style, type_, width)
+import Html exposing ( Html, button, div, h2,  text)
+import Html.Attributes exposing (attribute, class,  id, style, type_)
 import Html.Events exposing (onClick)
 import Http exposing (Metadata)
 import Http.Detailed exposing (Error)
 import Replay.Data exposing (ScanInfo)
 import Replay.Requests as Requests
 import Route exposing (Route(..))
-import Task exposing (succeed)
+
 
 
 

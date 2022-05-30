@@ -45,7 +45,7 @@ main =
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( initModel, Route.modifyUrl Route.Scanner )
+    ( initModel, Cmd.none )
 
 
 initModel : Model
