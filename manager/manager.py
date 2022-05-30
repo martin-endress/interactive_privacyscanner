@@ -7,8 +7,12 @@ from flask_sock import Sock
 from podman.errors import PodmanError
 
 import logs
+import result
+import scanner_messages
+from errors import ScannerError
 from interactive_scanner import InteractiveScanner
 from podman_container import run_container, podman_available, stop_container
+from result import ResultKey
 from scanner_messages import ScannerMessage, MessageType
 
 # Init logging
@@ -43,8 +47,9 @@ def start_scan():
     The subprocess is instructed through a message queue.
     The initial scan is executed.
     """
+    logger.debug('start_scan')
     # Fail fast
-    if request.json == None:
+    if request.json is None:
         return Response("Request must be a json containing the URL.", status=400)
     url = request.json['url']
     try:
@@ -68,7 +73,7 @@ def start_scan():
     scanner.start()
 
     # Start initial scan
-    scanner.put_msg(ScannerMessage(MessageType.StartScan, content=''))
+    scanner.put_msg(ScannerMessage(MessageType.StartScan))
 
     # Respond
     response_body = json.dumps(
@@ -78,21 +83,21 @@ def start_scan():
 
 @app.route('/register_interaction', methods=['POST'])
 def register_interaction():
-    logging.info('registering interaction')
+    logging.debug('/register_interaction')
     try:
         scanner = get_scanner()
     except ValueError as e:
         return Response('Client Error: %s' % str(e), status=400)
-    scanner.put_msg(ScannerMessage(
-        MessageType.RegisterInteraction, content=''))
+    scanner.put_msg(ScannerMessage(MessageType.RegisterInteraction))
     return Response(status=200)
 
 
 @app.route('/stop_scan', methods=['POST'])
 def stop_scan():
+    logging.debug('/stop_scan')
     try:
         scanner = get_scanner()
-        scanner.put_msg(ScannerMessage(MessageType.StopScan, content=''))
+        scanner.put_msg(ScannerMessage(MessageType.StopScan))
         return Response('Scan completion initiated.', status=200)
     except PodmanError as e:
         return Response('Server Error: %s' % str(e), status=500)
@@ -104,7 +109,7 @@ def stop_scan():
 def clear_cookies():
     try:
         scanner = get_scanner()
-        scanner.put_msg(ScannerMessage(MessageType.ClearCookies, content=''))
+        scanner.put_msg(ScannerMessage(MessageType.ClearCookies))
         return Response('Cookies deleted.', status=200)
     except PodmanError as e:
         return Response('Server Error: %s' % str(e), status=500)
@@ -116,7 +121,7 @@ def clear_cookies():
 def take_screenshot():
     try:
         scanner = get_scanner()
-        scanner.put_msg(ScannerMessage(MessageType.TakeScreenshot, content=''))
+        scanner.put_msg(ScannerMessage(MessageType.TakeScreenshot))
         return Response('Screenshot saved.', status=200)
     except PodmanError as e:
         return Response('Server Error: %s' % str(e), status=500)
@@ -157,9 +162,66 @@ def stop_all_scans():
     return Response('Shutdown successful.', status=200)
 
 
+@app.route('/get_all_scans', methods=['GET'])
+def get_all_scans():
+    scans = result.get_all_scans()
+    response_body = json.dumps(scans, sort_keys=True)
+    return Response(response_body, status=200)
+
+
+@app.route('/replay_scan', methods=['POST'])
+def replay_scan():
+    # Get Scan Info
+    if request.json is None:
+        return Response('Client Error: Request must be a JSON', status=400)
+    result_id = request.json['result_id']
+    try:
+        scan_info = result.get_scan_info(result_id)
+    except ScannerError as e:
+        return Response(f'Client Error, result not found: {e}')
+
+    # Start container
+    try:
+        container = run_container()
+    except PodmanError as e:
+        msg = str(e)
+        logger.error(msg)
+        return Response(msg, status=503)
+
+    scanner = InteractiveScanner(scan_info[ResultKey.SITE_URL],
+                                 container.devtools_port,
+                                 container.id, None,
+                                 reference_scan_id=result_id)
+    scanners[container.id] = scanner
+    scanner.start()
+
+    # Define sequence
+    for m in scanner_message_sequence(scan_info[ResultKey.INTERACTION]):
+        scanner.put_msg(m)
+
+    # Respond
+    response_body = json.dumps({"vnc_port": container.vnc_port})
+    return Response(response_body, status=200)
+
+
+def scanner_message_sequence(interaction):
+    message_sequence = []
+    for i in interaction:
+        # perform user interaction
+        for user_interaction in i[ResultKey.USER_INTERACTION]:
+            scan_msg = ScannerMessage(MessageType.PerformUserInteraction, content=user_interaction)
+            message_sequence.append(scan_msg)
+
+        # register event / stop scan
+        scan_msg = scanner_messages.from_result_key(i[ResultKey.EVENT])
+        message_sequence.append(scan_msg)
+    return message_sequence
+
+
 def get_scanner():
-    request_body = request.get_json()
-    container_id = request_body["container_id"]
+    if request.json is None:
+        raise ValueError("Request must be JSON containing the container id.")
+    container_id = request.json["container_id"]
     if container_id in scanners:
         return scanners[container_id]
     else:

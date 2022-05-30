@@ -1,24 +1,71 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import urlparse
 
+import logs
 import utils
-from errors import ScannerInitError
+from errors import ScannerInitError, ScannerError
 from utils import DirectoryFileHandler
 
 
-class Result(object):
-    '''
-    see https://github.com/PrivacyScore/privacyscanner/blob/master/privacyscanner/result.py
-    '''
+class ResultKey:
+    # interaction types
+    INITIAL_SCAN = 'initial scan'
+    MANUAL_INTERACTION = 'manual interaction'
+    DELETE_COOKIES = 'delete cookies'
+    END_SCAN = 'end scan'
 
-    def __init__(self, result_dict, result_file):
+    # interaction
+    INTERACTION = 'interaction'
+
+    # interaction entries
+    SITE_URL = 'site url'
+    URL = 'url'
+    EVENT = 'event'
+    TIMESTAMP = 'timestamp'
+    SCREENSHOTS = 'screenshots'
+    USER_INTERACTION = 'user interaction'
+    ERROR = 'error'
+
+
+# filename format
+FIRST_SCAN = 'first_scan'
+RECORDED_SCAN_PREFIX = 'recorded_scan_'
+
+# file / folder names
+RESULT_FILENAME = 'result.json'
+RESULT_PATH = "results"
+
+logger = logs.get_logger('results')
+
+
+class Result:
+    """
+    see https://github.com/PrivacyScore/privacyscanner/blob/master/privacyscanner/result.py
+    """
+
+    def __init__(self, result_dict, result_id, initial_scan):
         self._result_dict = result_dict
-        self._result_file = result_file
-        self._file_handler = DirectoryFileHandler(result_file.parent)
+        self._result_path = (Path(RESULT_PATH) / result_id).resolve()
+        self._current_scan_path = self.get_current_scan_path(initial_scan)
+        self._file_handler = DirectoryFileHandler(self._current_scan_path)
         self._updated_keys = set()
         self.num_screenshots = 0
+        self.store_result()
+
+    def get_current_scan_path(self, initial_scan):
+        if initial_scan and self._result_path.exists():
+            raise ScannerInitError('Result folder already exists.')
+
+        if initial_scan:
+            return self._result_path / FIRST_SCAN
+        else:
+            recording_id = 0
+            next_recorded_path = (self._result_path / (RECORDED_SCAN_PREFIX + str(recording_id)))
+            while next_recorded_path.exists():
+                recording_id += 1
+                next_recorded_path = (self._result_path / (RECORDED_SCAN_PREFIX + str(recording_id)))
+            return next_recorded_path
 
     def get_files_path(self):
         return self._file_handler.get_files_path()
@@ -89,48 +136,68 @@ class Result(object):
         return self._result_dict
 
     def store_result(self):
+        result_file = self._current_scan_path / RESULT_FILENAME
         try:
-            with self._result_file.open("w") as f:
-                json.dump(self.get_results(),
-                          f, indent=2, sort_keys=True)
+            with result_file.open("w") as f:
+                json.dump(self._result_dict, f, indent=2, sort_keys=True)
                 f.write("\n")
         except IOError as e:
-            raise ScannerInitError(
-                "Could not write result JSON: {}".format(e)) from e
+            raise ScannerInitError("Could not write result JSON: {}".format(e)) from e
 
 
-def init_from_scanner(url):
-    site_parsed = urlparse(url)
-    if site_parsed.scheme not in ("http", "https"):
-        raise ScannerInitError("Invalid site url: {}".format(url))
-    # TODO add ability to override this in options
-    results_dir = get_result_path(site_parsed.netloc)
-    if results_dir.exists() or results_dir.is_file():
-        raise ScannerInitError("Folder already exists." + str(results_dir))
-    try:
-        results_dir.mkdir(parents=True)
-    except IOError as e:
-        raise ScannerInitError("Could not create results directory: {}".format(e)) from e
-
-    result_file = results_dir / "results.json"
-    result_json = {"site_url": url,
-                   #   "scan_start": datetime.utcnow(),
-                   "interaction": []}
-    try:
-        with result_file.open("w") as f:
-            json.dump(result_json, f, indent=2)
-            f.write("\n")
-    except IOError as e:
-        raise ScannerInitError(
-            "Could not write result JSON: {}".format(e)) from e
-
-    return Result(result_json, result_file)
+def get_scan_info(result_id):
+    """
+    Returns the filtered result of the first scan.
+    :param result_id: result id referencing the result root folder
+    :return: result json containing urls, events and user interaction of the first scan
+    """
+    result_path = (Path("results") / result_id / FIRST_SCAN / RESULT_FILENAME).resolve()
+    if not result_path.exists() or result_path.is_dir():
+        raise ScannerError(f"Result file {str(result_path)} does not exist.")
+    with open(result_path) as f:
+        first_result = json.load(f)
+        interaction_filtered = list(map(filter_entry, first_result[ResultKey.INTERACTION]))
+        return {ResultKey.SITE_URL: first_result[ResultKey.SITE_URL], ResultKey.INTERACTION: interaction_filtered}
 
 
-def get_result_path(netloc):
+def filter_entry(e):
+    interaction_filter = [ResultKey.URL,
+                          ResultKey.EVENT,
+                          ResultKey.USER_INTERACTION]
+    return filter_dict(e, interaction_filter)
+
+
+def get_all_scans():
+    scans = []
+    scan_path = Path(RESULT_PATH)
+    for p in scan_path.iterdir():
+        current_scan = {'id': p.name, 'replays': []}
+        if not p.is_dir():
+            continue
+        for scan in p.iterdir():
+            logger.debug(scan)
+            success = scan_successful(scan)
+            if scan.name == FIRST_SCAN:
+                current_scan['initial'] = {'success': success}
+            else:
+                current_scan['replays'].append({'success': success})
+        scans.append(current_scan)
+    return scans
+
+
+def scan_successful(path):
+    with open(path / RESULT_FILENAME) as f:
+        r = json.load(f)
+        return not (ResultKey.ERROR in r)
+
+
+def filter_dict(d, keys):
+    return {k: d[k] for k in d.keys() & keys}
+
+
+def get_result_id(netloc):
     now = datetime.now().strftime("%y-%m-%d_%H-%M")
-    dir_name = "%s_%s" % (utils.slugify(netloc), now)
-    return (Path("results") / dir_name).resolve()
+    return "%s_%s" % (utils.slugify(netloc), now)
 
 
 async def parse_request(request):

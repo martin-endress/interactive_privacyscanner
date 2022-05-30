@@ -12,15 +12,17 @@ import result
 from browser import Browser
 from errors import ScannerInitError, ScannerError
 from extractors import CookiesExtractor, RequestsExtractor, ResponsesExtractor
+from result import Result, ResultKey
 from scanner_messages import ScannerMessage, MessageType
 
 EXTRACTOR_CLASSES = [CookiesExtractor, RequestsExtractor, ResponsesExtractor]
+SCANNER_KEY = 'SCANNER_INTERACTION'
 
 logger = logs.get_logger('scanner')
 
 
 class InteractiveScanner(Thread):
-    def __init__(self, url, debugging_port, container_id, options):
+    def __init__(self, url, debugging_port, container_id, options, reference_scan_id=None):
         super().__init__()
         # Mark this thread as daemon
         self.daemon = True
@@ -38,12 +40,25 @@ class InteractiveScanner(Thread):
         # Init Scanner
         self.url = url
         self.start_url_netloc = urlparse(url).netloc
-        self.options = options
+        self.initial_scan = reference_scan_id is None
+        self.result = self._init_result() if self.initial_scan else self._load_result(reference_scan_id)
         self.debugging_port = debugging_port
         self.container_id = container_id
-        self.result = result.init_from_scanner(url)
+        self.options = options
         self._extractors = []
-        self.page = Page(int(time.time()))
+        self._page = Page()
+
+    def _init_result(self):
+        site_parsed = urlparse(self.url)
+        if site_parsed.scheme not in ("http", "https"):
+            raise ScannerInitError("Invalid site url: {}".format(self.url))
+        result_json = {ResultKey.SITE_URL: self.url, ResultKey.INTERACTION: []}
+        result_id = result.get_result_id(site_parsed.netloc)
+        return Result(result_json, result_id, self.initial_scan)
+
+    def _load_result(self, reference_scan_id):
+        result_json = {ResultKey.SITE_URL: self.url, ResultKey.INTERACTION: []}
+        return Result(result_json, reference_scan_id, self.initial_scan)
 
     async def _init_queue(self):
         self._queue = janus.Queue()
@@ -53,6 +68,7 @@ class InteractiveScanner(Thread):
         self.event_loop.close()
 
     def put_msg(self, msg):
+        logger.debug(f'Scanner message {msg} added to Queue.')
         if not isinstance(msg, ScannerMessage):
             raise ScannerError('Element is not a Scanner Message.')
         if self._queue is None:
@@ -72,14 +88,17 @@ class InteractiveScanner(Thread):
                         self.logger.info('Scan complete, terminating thread.')
                         break
                 except ScannerError as e:
-                    self.logger.error(str(e))
-                    continue
+                    error_msg = str(e)
+                    self.logger.error(error_msg)
+                    self.result[ResultKey.ERROR] = error_msg
+                    self.result.store_result()
+                    break
         # Stop container after disconnecting from browser
         podman_container.stop_container(self.container_id)
         self.send_socket_msg({"ScanComplete": ""})
 
     async def _process_message(self, message):
-        self.logger.info('processing message %s' % str(message))
+        self.logger.info(f'processing message {message}')
         match message:
             case ScannerMessage(message_type=MessageType.StartScan):
                 await self._start_scan()
@@ -89,13 +108,14 @@ class InteractiveScanner(Thread):
                 await self._clear_cookies()
             case ScannerMessage(message_type=MessageType.TakeScreenshot):
                 await self._take_screenshot()
+            case ScannerMessage(message_type=MessageType.PerformUserInteraction):
+                await self._perform_user_interaction(message.content)
             case ScannerMessage(message_type=MessageType.StopScan):
                 await self._stop_scan()
                 # send poison pill
                 return True
             case unknown_command:
-                raise ScannerError(
-                    f"Unknown command '{unknown_command}' ignored.")
+                raise ScannerError(f"Unknown command '{unknown_command}' ignored.")
         return False
 
     # Socket Communication
@@ -121,7 +141,7 @@ class InteractiveScanner(Thread):
         await self._register_callbacks()
         await self.browser.ignore_inputs(True)
         await self._navigate_to_page()
-        await self._record_information('initial scan')
+        await self._record_information(ResultKey.INITIAL_SCAN)
         await self.browser.ignore_inputs(False)
         self.send_socket_msg({"ScanComplete": ""})
 
@@ -137,35 +157,35 @@ class InteractiveScanner(Thread):
         if not self.start_url_netloc == url_parsed.netloc:
             self.logger.info("Site exited or forwarded..")
 
-        intermediate_result = {"url": url,
-                               "event": reason,
-                               "timestamp": self.page.scan_time,
-                               "screenshots": self.page.screenshots,
-                               }
+        intermediate_result = {ResultKey.URL: url, ResultKey.EVENT: reason, ResultKey.TIMESTAMP: self._page.scan_time,
+                               ResultKey.SCREENSHOTS: self._page.screenshots,
+                               ResultKey.USER_INTERACTION: self._page.user_interaction}
         self._extractors.clear()
         for extractor_class in EXTRACTOR_CLASSES:
-            self._extractors.append(extractor_class(
-                self.browser,
-                self.page,
-                self.options
-            ))
+            self._extractors.append(extractor_class(self.browser, self._page, self.options))
 
         for extractor in self._extractors:
             extractor_info = await extractor.extract_information()
             # append result
             intermediate_result = intermediate_result | extractor_info.copy()
-        self.page = Page(int(time.time()))
-        self.result["interaction"].append(intermediate_result.copy())
+        self._page = Page()
+        self.result[ResultKey.INTERACTION].append(intermediate_result.copy())
+
+    async def _perform_user_interaction(self, user_interaction):
+        if self.initial_scan:
+            logger.error('Illegal State. Recorded interactions only available in replay mode.')
+        else:
+            await self.browser.perform_user_interaction(user_interaction)
 
     async def _register_interaction(self):
         await self.browser.ignore_inputs(True)
-        await self._record_information('manual interaction')
+        await self._record_information(ResultKey.MANUAL_INTERACTION)
         await self.browser.ignore_inputs(False)
         self.send_socket_msg({"ScanComplete": ""})
 
     async def _clear_cookies(self):
         await self.browser.ignore_inputs(True)
-        await self._record_information('cookies deleted')
+        await self._record_information(ResultKey.DELETE_COOKIES)
         await self.browser.clear_cookies()
         await self.browser.ignore_inputs(False)
         self.send_socket_msg({"ScanComplete": ""})
@@ -173,31 +193,41 @@ class InteractiveScanner(Thread):
 
     async def _take_screenshot(self):
         path = self.result.get_files_path() / f'screenshot_{self.result.num_screenshots}.jpeg'
-        self.page.add_screenshot_path(path)
+        self._page.add_screenshot_path(path)
         await self.browser.take_screenshot(path)
         self.result.num_screenshots += 1
         self.send_socket_msg({"Log": "Screenshot saved."})
 
     async def _stop_scan(self):
         await self.browser.ignore_inputs(True)
-        await self._record_information('end scan')
+        await self._record_information(ResultKey.END_SCAN)
         self.result.store_result()
 
     # Callback Functions
 
     async def _request_sent(self, request):
-        self.page.add_request(request)
+        self._page.add_request(request)
 
     async def _response_received(self, response):
-        self.page.add_response(response)
+        self._page.add_response(response)
 
     async def _frame_navigated(self, frame):
-        logger.debug(f"Frame navigated. (type: {frame['type']})")
+        logger.debug(frame)
         frame = frame['frame']
+        logger.debug(f"Frame navigated. (type: {frame['type']})")
         if frame['url'] != 'about:blank':
             url = urlparse(frame['url'])
             url_str = f"{url.scheme}://{url.netloc}/..."
             self.send_socket_msg({"URLChanged": url_str})
+
+    async def _console_msg_received(self, console_message):
+        msg_text = console_message.text
+        if msg_text.startswith(SCANNER_KEY):
+            interaction_json = json.loads(msg_text[len(SCANNER_KEY):])
+            self._page.add_interaction(interaction_json)
+        else:
+            logger.debug('console message: ' + msg_text)
+            pass  # ignore other messages
 
     # Callback Definition
 
@@ -216,18 +246,17 @@ class InteractiveScanner(Thread):
         self.browser.register_page_event("request", self._request_sent)
         self.browser.register_page_event("response", self._response_received)
         # self.browser.register_page_event("framenavigated", self._frame_navigated)
-        self.browser.register_event("Page.frameNavigated", self._frame_navigated)
-        # self.browser.register_event("BackgroundService.backgroundServiceEventReceived",
-        #                            self._backgroundServiceEventReceived)
+        self.browser.register_page_event("console", self._console_msg_received)
 
 
 class Page:
-    def __init__(self, scan_time):
-        self.scan_time = scan_time
+    def __init__(self):
+        self.scan_time = int(time.time())
         self.request_log = []
         self.failed_request_log = []
         self.response_log = []
         self.screenshots = []
+        self.user_interaction = []
 
     def add_request(self, request):
         self.request_log.append(request)
@@ -237,11 +266,11 @@ class Page:
 
     def add_response(self, response):
         self.response_log.append(response)
-        # for r in self.request_log:
-        #    if r['id'] == requestId:
-        #        if not r['responses']:
-        #            r['responses'] = list()
-        #        r['responses'].append(response)
+
+        # for r in self.request_log:  #    if r['id'] == requestId:  #        if not r['responses']:  #            r['responses'] = list()  #        r['responses'].append(response)
 
     def add_screenshot_path(self, path):
         self.screenshots.append(str(path))
+
+    def add_interaction(self, interaction):
+        self.user_interaction.append(interaction)

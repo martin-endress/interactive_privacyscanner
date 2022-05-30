@@ -5,16 +5,8 @@ import Http exposing (Metadata)
 import Http.Detailed exposing (Error, expectJson, expectWhatever)
 import Json.Decode as D
 import Json.Encode as E
+import Requests exposing (managerApi)
 import Scan.Data exposing (ContainerStartInfo)
-
-
-managerApi : String -> String
-managerApi path =
-    "http://scanner.psi.test/api/" ++ path
-
-
-
--- REQUESTS
 
 
 startScan : (Result (Error String) ( Metadata, ContainerStartInfo ) -> msg) -> String -> Cmd msg

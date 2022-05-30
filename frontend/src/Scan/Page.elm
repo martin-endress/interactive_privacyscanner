@@ -1,4 +1,4 @@
-port module Scan.Page exposing (..)
+module Scan.Page exposing (..)
 
 import Bytes exposing (Bytes)
 import Delay
@@ -7,9 +7,10 @@ import Html.Attributes exposing (attribute, class, disabled, style)
 import Html.Events exposing (onClick, onInput, onMouseEnter, onMouseLeave)
 import Http exposing (Metadata)
 import Http.Detailed exposing (Error)
-import Json.Decode as D
 import Json.Encode as E
 import Maybe
+import Ports
+import Route exposing (Route(..))
 import Scan.Data as Data exposing (ContainerStartInfo, LogEntry, ScanState(..), ScanUpdate(..), scanUpdateToString)
 import Scan.Requests as Requests
 import Scan.View as View
@@ -37,8 +38,7 @@ type alias Connection =
 
 
 type Msg
-    = Empty
-    | UpdateUrlInput String
+    = UpdateUrlInput String
     | SetGuacamoleFocus Bool
     | StartScan
     | GotStartScan (Result (Error String) ( Metadata, ContainerStartInfo ))
@@ -49,22 +49,7 @@ type Msg
     | FinishScan
     | TakeScreenshot
     | ClearBrowserCookies
-
-
-
--- PORTS
-
-
-port connectTunnel : E.Value -> Cmd msg
-
-
-port disconnectTunnel : () -> Cmd msg
-
-
-port setGuacamoleFocus : Bool -> Cmd msg
-
-
-port messageReceiver : (D.Value -> msg) -> Sub msg
+    | ViewResults
 
 
 
@@ -90,9 +75,6 @@ init =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        Empty ->
-            ( model, Cmd.none )
-
         UpdateUrlInput newUrl ->
             ( { model
                 | urlInput = newUrl
@@ -102,7 +84,7 @@ update msg model =
 
         SetGuacamoleFocus focus ->
             ( { model | guacamoleFocus = focus }
-            , setGuacamoleFocus focus
+            , Ports.setGuacamoleFocus focus
             )
 
         StartScan ->
@@ -124,7 +106,7 @@ update msg model =
             ( model
             , model.connection
                 |> Maybe.map encodeConnection
-                |> Maybe.map connectTunnel
+                |> Maybe.map Ports.connectTunnel
                 |> Maybe.withDefault Cmd.none
             )
 
@@ -167,6 +149,11 @@ update msg model =
                 |> Maybe.withDefault Cmd.none
             )
 
+        ViewResults ->
+            ( model
+            , Route.modifyUrl Results
+            )
+
 
 finishScanCommands : Model -> Cmd Msg
 finishScanCommands model =
@@ -177,7 +164,7 @@ finishScanCommands model =
                 |> Maybe.map (Requests.finishScan <| GotRequestResult (Just FinalScanInProgress))
                 |> Maybe.withDefault Cmd.none
     in
-    Cmd.batch [ finishCmd, disconnectTunnel () ]
+    Cmd.batch [ finishCmd, Ports.disconnectTunnel () ]
 
 
 processStartResult : Model -> Result (Error String) ( Metadata, ContainerStartInfo ) -> ( Model, Cmd Msg )
@@ -287,7 +274,7 @@ appendLogEntry entry model =
 
 messageSubscription : Sub Msg
 messageSubscription =
-    messageReceiver Data.mapScanUpdated
+    Ports.messageReceiver Data.mapScanUpdated
         |> Sub.map ReceiveScanUpdate
 
 
@@ -313,6 +300,8 @@ viewStatusPanel model =
         , class "p-0"
         , class "bg-light"
         , class "vh-100"
+        , class "d-flex"
+        , class "flex-column"
         ]
         [ h4 [ class "m-3", class "text-center" ] [ text "Interactive Privacyscanner" ]
         , viewStartInput model
@@ -321,6 +310,20 @@ viewStatusPanel model =
         , View.viewDescriptionText "Interactions" <| String.fromInt model.interactionCount
         , viewButtons (model.scanState == AwaitingInteraction)
         , View.viewLog model.log
+        , div [ class "row", class "justify-content-center", class "flex-grow-1" ] []
+        , div [ class "container", class "m-1" ]
+            [ div
+                [ class "row" ]
+                [ button
+                    [ class "btn"
+                    , class "btn-success"
+                    , class "m-1"
+                    , class "col"
+                    , onClick ViewResults
+                    ]
+                    [ text "View Results" ]
+                ]
+            ]
         ]
 
 

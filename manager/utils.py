@@ -10,8 +10,8 @@ class DirectoryFileHandler:
         result_dir = Path(result_dir).absolute()
         self._files_dir = result_dir / 'files'
         self._debug_files_dir = result_dir / 'debug_files'
-        self._files_dir.mkdir(exist_ok=True)
-        self._debug_files_dir.mkdir(exist_ok=True)
+        self._files_dir.mkdir(parents=True)
+        self._debug_files_dir.mkdir(parents=True)
 
     def get_files_path(self):
         return self._files_dir
