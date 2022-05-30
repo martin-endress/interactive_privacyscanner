@@ -1,6 +1,61 @@
 import asyncio
+import json
+from pathlib import Path
+from urllib.parse import urlparse
 
 from playwright.async_api import async_playwright, TimeoutError
+
+import result
+
+
+def analyze_interactions():
+    scan_path = Path(result.RESULT_PATH)
+    for result_folder in scan_path.iterdir():
+        if not result_folder.is_dir():
+            print(f'{result_folder.name} skipped.')
+            continue
+        print(f'Analyzing result {result_folder.name}...')
+        first_result_json_path = result_folder / result.FIRST_SCAN / result.RESULT_FILENAME
+        with open(first_result_json_path) as f:
+            r = json.load(f)
+
+            scan_domain = str(urlparse(r[result.ResultKey.SITE_URL]).netloc)
+            if scan_domain.startswith('www.'):
+                scan_domain = scan_domain[len('www.'):]
+
+            interaction = r[result.ResultKey.INTERACTION]
+            if len(interaction) != 2:
+                print('Error! Two interactions required.')
+                continue
+
+            before_click = interaction[0]
+            print('before')
+            print(get_third_parties_c(scan_domain, before_click['cookies']))
+            print(get_third_parties_r(scan_domain, before_click['requests']))
+
+            after_click = interaction[1]
+            print('after')
+            print(get_third_parties_c(scan_domain, after_click['cookies']))
+            print(get_third_parties_r(scan_domain, after_click['requests']))
+
+
+def get_third_parties_c(first_party, cookies):
+    cookies_parties = set()
+    for c in cookies:
+        d = c['domain']
+        if not d.endswith(first_party):
+            cookies_parties.add(c['domain'])
+    return cookies_parties
+
+
+def get_third_parties_r(first_party, requests):
+    requests_parties = set()
+    for r in requests:
+        net_loc = str(urlparse(r['url']).netloc)
+        if not net_loc.endswith(first_party):
+            requests_parties.add(net_loc)
+    return requests_parties
+
 
 selectors = [
     # generated through browser inspector (2)
@@ -13,7 +68,7 @@ selectors = [
 ]
 
 
-async def main():
+async def test_selectors():
     async with async_playwright() as playwright:
         chromium = playwright.chromium
         browser = await chromium.launch(headless=False)
@@ -43,4 +98,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    analyze_interactions()
