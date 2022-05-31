@@ -9,18 +9,19 @@ Thesis Advisor: [Henning Pridöhl](https://www.uni-bamberg.de/psi/team/henning-p
 
 
 
-## Requirements
+## Build Requirements
 
-Following dependencies must be installed to run this project:
+Following dependencies must be installed to deploy this project:
 
-The user `scanner` is used (e.g. `adduser scanner`).
 
 ### System Files
+
+The user `scanner` is created (e.g. `adduser scanner`).
+The repository is cloned to `/home/scanner`.
 
 Custom systemd files are linked or placed in `/etc/systemd/system`:
 
 ```
-/etc/systemd/system $
 ln -s /home/scanner/interactive_privacyscanner/system_files/privacyscanner_manager.service
 ln -s /home/scanner/interactive_privacyscanner/system_files/interactive-privacyscanner.target
 ```
@@ -29,7 +30,7 @@ ln -s /home/scanner/interactive_privacyscanner/system_files/interactive-privacys
 
 ### Python
 
-Python 3.10 or higher is required due to the use of pattern maching.
+Python 3.10 or higher is required due to the use of pattern matching.
 
 Further packages should be installed as a virtual env:
 
@@ -41,9 +42,6 @@ source venv/local/bin/activate
 pip install -r requirements.txt
 ```
 
-Ensure that `gunicorn` is installed.
-
-
 ### Podman
 
 [Podman](https://podman.io/) is a container engine for managing OCI containers on linux machines.
@@ -51,26 +49,27 @@ It facilitates the execution and isolation of complex applications in containers
 
 1. Install podman in [rootless mode](https://github.com/containers/podman/blob/main/docs/tutorials/rootless_tutorial.md):
     1. Install packages podman, slirp4netns, fuse-overlayfs .
-    2. Ensure that `/proc/sys/user/max_user_namespaces` is a reasonable number (15000). Problems might occure on RHEL7 machines.
+    2. Ensure that `/proc/sys/user/max_user_namespaces` is a reasonable number (15000). Problems might occur on RHEL7 machines.
     3. Add a repository to `/etc/containers/registries.conf`, for example (notice the [risk of using unqualified image names](https://github.com/containers/image/blob/main/docs/containers-registries.conf.5.md#note-risk-of-using-unqualified-image-names)):
-    ```
-    unqualified-search-registries = ["registry.fedoraproject.org"]
-    ```
+        ```
+        unqualified-search-registries = ["registry.fedoraproject.org"]
+        ```
     4. Assign `subuids` and `subgids` for user `scanner`:
+        ```
+        usermod --add-subuids 100000-165535 scanner
+        usermod --add-subgids 100000-165535 scanner
+        ```
+2. Enable the podman systemd service as a user (!) service. This step is not required for using podman from the command line (CLI), but is required for programmatic access.
     ```
-    usermod --add-subuids 100000-165535 scanner
-    usermod --add-subgids 100000-165535 scanner
+    systemctl --user start podman.socket
+    systemctl --user enable podman.socket
     ```
-2. Enable the podman system service as a user service. This step is not required for using podman from the command line (CLI), but is required for programmatic access.
-```
-systemctl --user start podman.socket
-systemctl --user enable podman.socket
-```
+3. Ensure that `podman.socket` is listening at `/run/user/$UID/podman/podman.sock`, with `$UID` > 1000. Adjust `manager.cfg` according to the socket listen address.
 4. Build the Browser container.
-```
-cd chrome_container/
-podman build -t chrome_scan .
-```
+    ```
+    cd chrome_container/
+    podman build -t chrome_scan .
+    ```
 
 ### Elm
 
