@@ -57,10 +57,6 @@ update msg model =
                     )
 
                 Err m ->
-                    let
-                        _ =
-                            Debug.log "Could not retrieve scans." m
-                    in
                     ( model, Cmd.none )
 
         ViewScanner ->
@@ -74,19 +70,11 @@ update msg model =
         GotReplayScan response ->
             case response of
                 Ok ( _, vncPort ) ->
-                    ( let
-                        _ =
-                            Debug.log "vnc port" vncPort
-                      in
-                      model
+                    ( model
                     , Cmd.none
                     )
 
                 Err m ->
-                    let
-                        _ =
-                            Debug.log "Could not replay scan." m
-                    in
                     ( model, Cmd.none )
 
 

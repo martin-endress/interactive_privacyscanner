@@ -159,10 +159,10 @@ mapScanUpdated msgJson =
             stateMsg
 
         Err errorMessage ->
-            let
-                _ =
-                    Debug.log "Illegal message detected:" ( errorMessage, E.encode 2 msgJson )
-            in
+            --let
+            --    _ =
+            --        Debug.log "Illegal message detected:" ( errorMessage, E.encode 2 msgJson )
+            --in
             NoOp
 
 

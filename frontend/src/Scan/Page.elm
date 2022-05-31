@@ -212,10 +212,10 @@ processScanUpdate scanUpdate model =
                 model
 
         ( GuacamoleMsg message, _ ) ->
-            let
-                _ =
-                    Debug.log "new state:" message
-            in
+            --let
+            --    _ =
+            --        Debug.log "new state:" message
+            --in
             appendLogEntry
                 { msg = "Guacamole msg:" ++ message, level = Data.Warning }
                 model
