@@ -13,22 +13,12 @@ Thesis Advisor: [Henning Pridöhl](https://www.uni-bamberg.de/psi/team/henning-p
 
 Following dependencies must be installed to deploy this project:
 
+### Repository and User
 
-### System Files
+Create a sudo user `scanner` (e.g. `adduser scanner`).
+Clone the repository to `/home/scanner` and link it from `/usr/lib`.
 
-The user `scanner` is created (e.g. `adduser scanner`).
-The repository is cloned to `/home/scanner`.
-
-Custom systemd files are linked or placed in `/etc/systemd/system`:
-
-```
-ln -s /home/scanner/interactive_privacyscanner/system_files/privacyscanner_manager.service
-ln -s /home/scanner/interactive_privacyscanner/system_files/interactive-privacyscanner.target
-```
-
-
-
-### Python
+### Python (Backend)
 
 Python 3.10 or higher is required due to the use of pattern matching.
 
@@ -42,7 +32,7 @@ source venv/local/bin/activate
 pip install -r requirements.txt
 ```
 
-### Podman
+### Podman (Backend)
 
 [Podman](https://podman.io/) is a container engine for managing OCI containers on linux machines.
 It facilitates the execution and isolation of complex applications in containers using systemd and other Linux kernel APIs.
@@ -73,12 +63,47 @@ It facilitates the execution and isolation of complex applications in containers
 
 ### Elm
 
+[Elm](https://elm-lang.org/) is a functional language that compiles to JavaScript (and html).
+It does without runtime exceptions, enforces understandable code, is fast and type safe.
+
+1. Download and install elm as described [here](https://guide.elm-lang.org/install/elm.html).
+2. Install `uglify-js`.
+3. make frontend (`frontend/Makefile`).
+
 ### Nginx
+
+Install nginx and enable the respective systemd unit.
+The nginx config file is linked in `/etc/nginx/sites-enabled/`:
+
+```
+ln -s /home/scanner/interactive_privacyscanner/system_files/nginx/scanner
+```
+
+The nginx configuration contains two server instances:
+`scanner.psi.live` serves the compiled frontend `target/scanner.html`, whereas `scanner.psi.test` proxies requests to a development server running separately, e.g., `elm-live`.
+See development section for details.
+
+Add both entries to `/etc/hosts`:
+
+```
+127.0.0.1     scanner.psi.test
+127.0.0.1     scanner.psi.live
+```
 
 ### Guacamole
 
 ### Python
 
+### System Files
+
+Following system files from `/system_files` must be moved or linked to specific locations:
+
+Systemd files must be linked in `/etc/systemd/system`:
+
+```
+ln -s /home/scanner/interactive_privacyscanner/system_files/privacyscanner_manager.service
+ln -s /home/scanner/interactive_privacyscanner/system_files/interactive-privacyscanner.target
+```
 
 
 ## Development
