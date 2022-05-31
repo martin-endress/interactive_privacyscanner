@@ -10,10 +10,40 @@ server {
     listen 80;
     listen [::]:80;
 
-    server_name scanner.psi.test;
-    # root /usr/share/?!?; (serve files?)
+    server_name scanner.psi.live;
+    root /usr/lib/interactive_privacyscanner/frontend/target;
 
-    # frontend
+    # Frontend
+    location / {
+        try_files /$uri /scanner.html =404;
+    }
+
+    # manager backend
+    location /api/ {
+        proxy_pass http://localhost:9000/;
+    }
+
+    # guacamole backend
+    location /guac/ {
+        proxy_pass http://localhost:8080/;
+    }
+
+    location ~* \.(?:jpg|jpeg|gif|png|ico|cur|gz|svg|svgz|mp4|ogg|ogv|webm|htc)$ {
+        gzip on;
+        expires 1M;
+        access_log off;
+        add_header Cache-Control "public";
+    }
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+
+    server_name scanner.psi.test;
+    root /usr/lib/interactive_privacyscanner/frontend/target;
+
+    # Frontend development server (e.g. elm-live)
     location / {
         proxy_pass http://localhost:9001/;
     }
