@@ -7,6 +7,7 @@ bin/
 
 ### Elm ###
 frontend/target/elm.js
+frontend/target/elm.min.js
 # elm-package generated files
 elm-stuff
 # elm-repl generated files
