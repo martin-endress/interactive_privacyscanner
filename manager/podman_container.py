@@ -2,29 +2,23 @@ import os
 
 from podman import PodmanClient
 from podman.errors import PodmanError, BuildError, NotFound, APIError
-
+import configparser
 import logs
 
 CHROME_IMAGE_TAG = "chrome_scan"
-PODMAN_SOCKET_URI = "unix:///run/user/1000/podman/podman.sock"
-XDG_RUNTIME_DIR = 'XDG_RUNTIME_DIR'
-PODMAN_SOCKET_URI_PRE = "unix://"
-PODMAN_SOCKET_URI_POST = "/podman/podman.sock"
 VNC_PORT = 5900
 DEVTOOLS_PORT = 9000
+
+PODMAN_SOCKET_URI_PRE = "unix://"
 
 logger = logs.get_logger('podman_api')
 
 def get_podman_socket_uri():
-    xdg_runtime = os.getenv(XDG_RUNTIME_DIR)
-    logger.error(f'xdg={xdg_runtime}')
-    if XDG_RUNTIME_DIR in os.environ:
-        logger.error('happy')
-        xdg_runtime = os.getenv(XDG_RUNTIME_DIR)
-        return PODMAN_SOCKET_URI_PRE + xdg_runtime + PODMAN_SOCKET_URI_PRE
-    else:
-        logger.error(f'resort to default URI {PODMAN_SOCKET_URI}')
-        return PODMAN_SOCKET_URI
+    config = configparser.ConfigParser()
+    config.read('manager.cfg')
+    socket_uri = PODMAN_SOCKET_URI_PRE + config['podman']['podman_socket']
+    return socket_uri
+
 
 
 # libpod rootless service unix domain socket
