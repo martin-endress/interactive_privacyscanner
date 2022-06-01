@@ -18,6 +18,31 @@ Following dependencies must be installed to deploy this project:
 Create a sudo user `scanner` (e.g. `adduser scanner`).
 Clone the repository to `/home/scanner` and link it from `/usr/lib`.
 
+### Guacamole + Tomcat (Backend)
+
+[Guacamole](https://guacamole.apache.org/) is a clientless remote desktop gateway.
+It supports the protocols VNC, RDP, and SSH.
+
+The guacamole backend `guacd` is independent from the guacamole application servlet.
+Follow the instructions of [Installing Guacamole natively](https://guacamole.apache.org/doc/gug/installing-guacamole.html) for a VNC setup.
+
+> Depending on your distribution, some package names might not match the guide exactly, may even be installed from source, or might require you to change source repositories.
+
+
+> If Java 11 does not work, try Java 8.
+
+After installation of guacamole and tomcat, deploy the servlet to tomcat.
+
+```
+scanner:~/interactive_privacyscanner/guacamole_backend$
+mvn package
+mv target/guacamole-backend-1.0.war /var/lib/tomcat8/webapps/
+```
+
+Start and enable the systemd units `guacd.service` and `tomcat.service`.
+
+> The directory `/var/lib/tomcat8/webapps/ROOT` can be removed safely.
+
 ### Python (Backend)
 
 Python 3.10 or higher is required due to the use of pattern matching.
@@ -61,7 +86,7 @@ It facilitates the execution and isolation of complex applications in containers
     podman build -t chrome_scan .
     ```
 
-### Elm
+### Elm (Frontend)
 
 [Elm](https://elm-lang.org/) is a functional language that compiles to JavaScript (and html).
 It does without runtime exceptions, enforces understandable code, is fast and type safe.
@@ -79,9 +104,9 @@ The nginx config file is linked in `/etc/nginx/sites-enabled/`:
 ln -s /home/scanner/interactive_privacyscanner/system_files/nginx/scanner
 ```
 
-The nginx configuration contains two server instances:
-`scanner.psi.live` serves the compiled frontend `target/scanner.html`, whereas `scanner.psi.test` proxies requests to a development server running separately, e.g., `elm-live`.
-See development section for details.
+> The nginx configuration contains two server instances:
+> `scanner.psi.live` serves the compiled frontend `target/scanner.html`, whereas `scanner.psi.test` proxies requests to a development server running separately, e.g., `elm-live`.
+> See development section for details.
 
 Add both entries to `/etc/hosts`:
 
@@ -90,7 +115,7 @@ Add both entries to `/etc/hosts`:
 127.0.0.1     scanner.psi.live
 ```
 
-### Guacamole
+Start and enable `nginx.service`.
 
 ### System Files
 
@@ -103,6 +128,7 @@ ln -s /home/scanner/interactive_privacyscanner/system_files/privacyscanner_manag
 ln -s /home/scanner/interactive_privacyscanner/system_files/interactive-privacyscanner.target
 ```
 
+> Check `systemctl list-dependencies interactive-privacyscanner.target` to see if all services are running.
 
 ## Development
 
