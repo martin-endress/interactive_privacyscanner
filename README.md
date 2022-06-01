@@ -92,11 +92,9 @@ Add both entries to `/etc/hosts`:
 
 ### Guacamole
 
-### Python
-
 ### System Files
 
-Following system files from `/system_files` must be moved or linked to specific locations:
+Following `/system_files` must be moved or linked to specific locations:
 
 Systemd files must be linked in `/etc/systemd/system`:
 
