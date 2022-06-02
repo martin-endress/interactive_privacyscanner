@@ -23,6 +23,15 @@ server {
         proxy_pass http://localhost:9000/;
     }
 
+    # Websocket manager backend (same server)
+    location /ws/ {
+        proxy_pass http://localhost:9000/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Host $host;
+    }
+
     # guacamole backend
     location /guac/ {
         proxy_pass http://localhost:8080/;
@@ -37,16 +46,10 @@ server {
 }
 
 server {
-    listen 443 ssl;
+    listen 80;
+    listen [::]:80;
 
-    server_name         scanner.psi.test;
-    ssl_certificate     /etc/nginx/certs/cert.pem;
-    ssl_certificate_key /etc/nginx/certs/key.pem;
-    
-    # defaults:
-    # ssl_protocols       TLSv1 TLSv1.1 TLSv1.2;
-    # ssl_ciphers         HIGH:!aNULL:!MD5;
-
+    server_name scanner.psi.test;
     root /usr/lib/interactive_privacyscanner/frontend/target;
 
     # Frontend development server (e.g. elm-live)
@@ -57,6 +60,15 @@ server {
     # manager backend
     location /api/ {
         proxy_pass http://localhost:9000/;
+    }
+
+    # Websocket manager backend (same server)
+    location /ws/ {
+        proxy_pass http://localhost:9000/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Host $host;
     }
 
     # guacamole backend
