@@ -97,8 +97,7 @@ It does without runtime exceptions, enforces understandable code, is fast and ty
 
 ### Nginx
 
-Install nginx and enable the respective systemd unit.
-The nginx config file is linked in `/etc/nginx/sites-enabled/`:
+Install nginx and link the config file in `/etc/nginx/sites-enabled/`:
 
 ```
 ln -s /home/scanner/interactive_privacyscanner/system_files/nginx/scanner
@@ -115,7 +114,7 @@ Add both entries to `/etc/hosts`:
 127.0.0.1     scanner.psi.live
 ```
 
-Start and enable `nginx.service`.
+Start and enable the systemd unit `nginx.service`.
 
 ### System Files
 
@@ -133,3 +132,5 @@ ln -s /home/scanner/interactive_privacyscanner/system_files/interactive-privacys
 ## Development
 
 elm-live src/Main.elm --start-page=src/scanner.html --port=9001 -- --output=elm.js
+
+
