@@ -56,7 +56,7 @@ update msg model =
                     , Cmd.none
                     )
 
-                Err m ->
+                Err _ ->
                     ( model, Cmd.none )
 
         ViewScanner ->
@@ -69,12 +69,12 @@ update msg model =
 
         GotReplayScan response ->
             case response of
-                Ok ( _, vncPort ) ->
+                Ok ( _, _ ) ->
                     ( model
                     , Cmd.none
                     )
 
-                Err m ->
+                Err _ ->
                     ( model, Cmd.none )
 
 

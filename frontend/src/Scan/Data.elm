@@ -2,7 +2,6 @@ module Scan.Data exposing (ContainerStartInfo, LogEntry, LogLevel(..), ScanState
 
 import Http.Detailed exposing (Error(..))
 import Json.Decode as D exposing (Decoder)
-import Json.Encode as E
 import String exposing (fromInt)
 
 
@@ -158,7 +157,7 @@ mapScanUpdated msgJson =
         Ok stateMsg ->
             stateMsg
 
-        Err errorMessage ->
+        Err _ ->
             --let
             --    _ =
             --        Debug.log "Illegal message detected:" ( errorMessage, E.encode 2 msgJson )

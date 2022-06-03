@@ -3,7 +3,7 @@ var app = Elm.Main.init({ node: document.getElementById("container") });
 
 // Instantiate client, using an HTTP tunnel for communications.
 var guac = new Guacamole.Client(
-    new Guacamole.HTTPTunnel("http://scanner.psi.test/guac/guacamole-backend-1.0/tunnel")
+    new Guacamole.HTTPTunnel("http://scanner.psi.live/guac/guacamole-backend-1.0/tunnel")
 );
 
 // Add client to display div

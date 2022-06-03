@@ -107,7 +107,7 @@ updatePage msg model =
         ( ResultsPage subModel, ResultsPageMsg subMsg ) ->
             toPage ResultsPage ResultsPageMsg ResultsPage.update subMsg subModel
 
-        bad_state ->
+        _ ->
             --let
             --    _ =
             --        Debug.log "Error in updatePage. Unexpected Update message received." bad_state

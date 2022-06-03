@@ -5,9 +5,9 @@ Description=Privacyscanner Backend that manages the scanning processes and conta
 ExecStart=gunicorn --threads 50 --bind localhost:9000 wsgi:app
 Restart=always
 RestartSec=60
-WorkingDirectory=/home/martin/git/interactive_privacyscanner/manager
+WorkingDirectory=/usr/lib/interactive_privacyscanner/manager
 # change user!!
-User=martin
+User=scanner
 
 [Install]
 WantedBy=graphical.target
