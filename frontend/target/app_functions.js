@@ -2,13 +2,14 @@
 var app = Elm.Main.init({ node: document.getElementById("container") });
 
 // Instantiate client, using an HTTP tunnel for communications.
-var guac = new Guacamole.Client(
-    new Guacamole.HTTPTunnel("http://scanner.psi.live/guac/guacamole-backend-1.0/tunnel")
+var client = new Guacamole.Client(
+    new Guacamole.HTTPTunnel("/guac/guacamole-backend-1.0/tunnel")
 );
 
 // Add client to display div
-var display = document.getElementById("display");
-display.appendChild(guac.getDisplay().getElement());
+var displayEl = document.getElementById("display");
+console.log(displayEl);
+displayEl.appendChild(client.getDisplay().getElement());
 
 // Send port messages
 function sendGuacamoleErrorMsg(msg) {
@@ -16,13 +17,13 @@ function sendGuacamoleErrorMsg(msg) {
     app.ports.messageReceiver.send(msg_json)
 }
 
-guac.onstatechange = function (state) {
+client.onstatechange = function (state) {
     const state_msg = 'new state=' + state;
     sendGuacamoleErrorMsg(state_msg);
 }
 
 // Send errors to Elm port
-guac.onerror = function (error) {
+client.onerror = function (error) {
     const error_msg = 'guac error (status=' + error.code.toString() + ') - ' + error.message;
     sendGuacamoleErrorMsg(error_msg);
 };
@@ -30,12 +31,12 @@ guac.onerror = function (error) {
 // Disconnect on close
 window.onunload = function () {
     // TODO wire this up with ELM
-    guac.disconnect();
+    client.disconnect();
     socket.close();
 }
 
 // Mouse and keyboard events on focus / unfocus
-const mouse = new Guacamole.Mouse(guac.getDisplay().getElement());
+const mouse = new Guacamole.Mouse(client.getDisplay().getElement());
 const keyboard = new Guacamole.Keyboard(document);
 
 // Focus guacamole element including key and mouse events
@@ -45,15 +46,15 @@ function focusGuacamole() {
     mouse.onmousedown =
         mouse.onmouseup =
         mouse.onmousemove = function (mouseState) {
-            guac.sendMouseState(mouseState);
+            client.sendMouseState(mouseState);
         };
 
     keyboard.onkeydown = function (keysym) {
-        guac.sendKeyEvent(1, keysym);
+        client.sendKeyEvent(1, keysym);
     };
 
     keyboard.onkeyup = function (keysym) {
-        guac.sendKeyEvent(0, keysym);
+        client.sendKeyEvent(0, keysym);
     };
 }
 
@@ -91,11 +92,11 @@ app.ports.pushUrl.subscribe(function (url) {
 
 function connectGuacamole(connection) {
     param = "port=" + connection.vncPort.toString()
-    guac.connect(param);
+    client.connect(param);
 }
 
 // Init Websocket
-const socket = new WebSocket('ws://scanner.psi.live/ws/addSocket');
+const socket = new WebSocket('ws://scanner.psi.test/ws/addSocket');
 
 // Event listeners
 socket.addEventListener("message", function (event) {
@@ -122,5 +123,5 @@ function connectWebsocket(connection) {
 
 // disconnect from guacamole
 app.ports.disconnectTunnel.subscribe(function () {
-    guac.disconnect();
+    client.disconnect();
 });
