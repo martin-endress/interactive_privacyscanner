@@ -96,7 +96,7 @@ function connectGuacamole(connection) {
 }
 
 // Init Websocket
-const socket = new WebSocket('ws://scanner.psi.test/ws/addSocket');
+const socket = new WebSocket('ws://scanner.psi.live/ws/addSocket');
 
 // Event listeners
 socket.addEventListener("message", function (event) {
