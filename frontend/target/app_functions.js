@@ -8,7 +8,6 @@ var client = new Guacamole.Client(
 
 // Add client to display div
 var displayEl = document.getElementById("display");
-console.log(displayEl);
 displayEl.appendChild(client.getDisplay().getElement());
 
 // Send port messages
@@ -80,7 +79,6 @@ app.ports.setGuacamoleFocus.subscribe(function (focus) {
 // connect to guacamole
 app.ports.connectTunnel.subscribe(function (connection) {
     connectGuacamole(connection);
-    connectWebsocket(connection);
 });
 
 // Change the URL upon request, inform app of the change.
@@ -96,7 +94,7 @@ function connectGuacamole(connection) {
 }
 
 // Init Websocket
-const socket = new WebSocket('ws://scanner.psi.live/ws/addSocket');
+const socket = new WebSocket('ws://scanner.psi.test/ws/add_socket');
 
 // Event listeners
 socket.addEventListener("message", function (event) {
@@ -107,19 +105,14 @@ socket.addEventListener("message", function (event) {
         app.ports.messageReceiver.send(msg_json)
     }
 });
+socket.addEventListener("error", function (event) {
+    msg_json = { "SocketError": "Web socket ERROR, this should never happen lol." }
+    app.ports.messageReceiver.send(msg_json)
+});
 socket.addEventListener("close", function (event) {
     msg_json = { "SocketError": "Websocket closed." }
     app.ports.messageReceiver.send(msg_json)
-})
-
-function connectWebsocket(connection) {
-    if (socket.readyState === 1) {
-        socket.send(connection.containerId);
-    } else {
-        msg_json = { "SocketError": "Websocket not available, ignoring all messages." }
-        app.ports.messageReceiver.send(msg_json)
-    }
-}
+});
 
 // disconnect from guacamole
 app.ports.disconnectTunnel.subscribe(function () {

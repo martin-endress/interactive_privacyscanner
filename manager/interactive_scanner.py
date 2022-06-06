@@ -22,7 +22,7 @@ logger = logs.get_logger('scanner')
 
 
 class InteractiveScanner(Thread):
-    def __init__(self, url, debugging_port, container_id, options, reference_scan_id=None):
+    def __init__(self, url, debugging_port, container_id, options, socket, reference_scan_id=None):
         super().__init__()
         # Mark this thread as daemon
         self.daemon = True
@@ -35,7 +35,7 @@ class InteractiveScanner(Thread):
         self.event_loop.run_until_complete(init_queue_task)
 
         # Set socket
-        self.client_socket = None
+        self.client_socket = socket
 
         # Init Scanner
         self.url = url
@@ -119,9 +119,6 @@ class InteractiveScanner(Thread):
         return False
 
     # Socket Communication
-
-    def set_socket(self, socket):
-        self.client_socket = socket
 
     def send_socket_msg(self, msg):
         msg_json = json.dumps(msg)

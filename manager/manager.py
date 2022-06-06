@@ -1,11 +1,13 @@
 import json
 import logging
+import secrets
 from urllib.parse import urlparse
 
 from flask import Flask, Response, request
 from flask_sock import Sock
 from podman.errors import PodmanError
 
+import config
 import logs
 import result
 import scanner_messages
@@ -19,11 +21,14 @@ from scanner_messages import ScannerMessage, MessageType
 logs.configure('scan_manager.log')
 logger = logs.get_logger('manager')
 
+# Init socket connections
+socket_connections = dict()
 # Init set of scanners (dict access is thread-safe https://docs.python.org/3/glossary.html#term-global-interpreter-lock)
 scanners = dict()
 
 # Init flask app
 app = Flask(__name__)
+app.secret_key = config.flask['secret_key']
 
 sock = Sock(app)
 
@@ -51,6 +56,11 @@ def start_scan():
     # Fail fast
     if request.json is None:
         return Response("Request must be a json containing the URL.", status=400)
+    socket_token = request.json['socket_token']
+    if socket_token not in socket_connections:
+        return Response("Socket token does not match any socket.", status=400)
+    socket = socket_connections[socket_token]
+
     url = request.json['url']
     try:
         urlparse(url)
@@ -68,7 +78,7 @@ def start_scan():
         return Response(msg, status=503)
 
     # Start scanner thread
-    scanner = InteractiveScanner(url, container.devtools_port, container.id, None)
+    scanner = InteractiveScanner(url, container.devtools_port, container.id, None, socket)
     scanners[container.id] = scanner
     scanner.start()
 
@@ -129,14 +139,14 @@ def take_screenshot():
         return Response('Client Error: %s' % str(e), status=400)
 
 
-@sock.route('/addSocket')
-def addSocket(socket):
-    logger.info("Socket added. Waiting for container id.")
+@sock.route('/add_socket')
+def add_socket(socket):
+    socket_token = secrets.token_hex()
+    socket.send(json.dumps({'SocketInit': socket_token}))
+    socket_connections[socket_token] = socket
     while True:
-        container_id = socket.receive()
-        if container_id in scanners:
-            scanners[container_id].set_socket(socket)
-            logger.info("Scanner socket info updated successfully.")
+        msg = socket.receive()
+        logger.info(f'socket msg{msg}')
 
 
 @app.route('/status', methods=['GET'])
@@ -190,7 +200,9 @@ def replay_scan():
 
     scanner = InteractiveScanner(scan_info[ResultKey.SITE_URL],
                                  container.devtools_port,
-                                 container.id, None,
+                                 container.id,
+                                 None,
+                                 None,
                                  reference_scan_id=result_id)
     scanners[container.id] = scanner
     scanner.start()

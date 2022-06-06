@@ -2,28 +2,21 @@ import os
 
 from podman import PodmanClient
 from podman.errors import PodmanError, BuildError, NotFound, APIError
-import configparser
+
+import config
 import logs
 
 CHROME_IMAGE_TAG = "chrome_scan"
 VNC_PORT = 5900
 DEVTOOLS_PORT = 9000
 
-PODMAN_SOCKET_URI_PRE = "unix://"
+PODMAN_SOCKET_URI = "unix://" + config.podman['podman_socket']
 
 logger = logs.get_logger('podman_api')
 
-def get_podman_socket_uri():
-    config = configparser.ConfigParser()
-    config.read('manager.cfg')
-    socket_uri = PODMAN_SOCKET_URI_PRE + config['podman']['podman_socket']
-    return socket_uri
-
-
-
 # libpod rootless service unix domain socket
 # (see https://docs.podman.io/en/latest/markdown/podman-system-service.1.html)
-podman_client = PodmanClient(base_url=get_podman_socket_uri(), version="2.0")
+podman_client = PodmanClient(base_url=PODMAN_SOCKET_URI, version="2.0")
 
 
 class Container:

@@ -9,8 +9,8 @@ import Requests exposing (managerApi)
 import Scan.Data exposing (ContainerStartInfo)
 
 
-startScan : (Result (Error String) ( Metadata, ContainerStartInfo ) -> msg) -> String -> Cmd msg
-startScan m scanUrl =
+startScan : (Result (Error String) ( Metadata, ContainerStartInfo ) -> msg) -> String -> String -> Cmd msg
+startScan m scanUrl socketToken =
     let
         resultDecoder =
             D.map2 ContainerStartInfo
@@ -22,7 +22,9 @@ startScan m scanUrl =
         , body =
             Http.jsonBody <|
                 E.object
-                    [ ( "url", E.string scanUrl ) ]
+                    [ ( "url", E.string scanUrl )
+                    , ( "socket_token", E.string socketToken )
+                    ]
         , expect = expectJson m resultDecoder
         }
 

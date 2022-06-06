@@ -22,6 +22,7 @@ import Scan.View as View
 
 type alias Model =
     { scanState : ScanState
+    , socketId : Maybe String
     , connection : Maybe Connection
     , interactionCount : Int
     , urlInput : String
@@ -59,6 +60,7 @@ type Msg
 init : Model
 init =
     { scanState = Idle
+    , socketId = Nothing
     , connection = Nothing
     , interactionCount = 0
     , currentUrl = ""
@@ -88,9 +90,7 @@ update msg model =
             )
 
         StartScan ->
-            ( updateScanState ConnectingToBrowser model
-            , Requests.startScan GotStartScan model.urlInput
-            )
+            startScan model
 
         GotStartScan result ->
             processStartResult model result
@@ -155,6 +155,22 @@ update msg model =
             )
 
 
+startScan : Model -> ( Model, Cmd Msg )
+startScan model =
+    case model.socketId of
+        Just socketId ->
+            ( updateScanState ConnectingToBrowser model
+            , Requests.startScan GotStartScan model.urlInput socketId
+            )
+
+        Nothing ->
+            ( appendLogEntry
+                { msg = "Socket not connected.", level = Data.Error }
+                model
+            , Cmd.none
+            )
+
+
 finishScanCommands : Model -> Cmd Msg
 finishScanCommands model =
     let
@@ -198,6 +214,9 @@ processScanUpdate scanUpdate model =
         ( NoOp, _ ) ->
             model
 
+        ( SocketInit id, Idle ) ->
+            { model | socketId = Just id }
+
         ( ScanComplete, ScanInProgress ) ->
             updateScanState
                 AwaitingInteraction
@@ -208,14 +227,10 @@ processScanUpdate scanUpdate model =
 
         ( SocketError message, _ ) ->
             appendLogEntry
-                { msg = "VNC error:" ++ message, level = Data.Error }
+                { msg = "Socket msg:" ++ message, level = Data.Error }
                 model
 
         ( GuacamoleMsg message, _ ) ->
-            --let
-            --    _ =
-            --        Debug.log "new state:" message
-            --in
             appendLogEntry
                 { msg = "Guacamole msg:" ++ message, level = Data.Warning }
                 model

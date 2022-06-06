@@ -122,6 +122,7 @@ stateToString status =
 
 type ScanUpdate
     = NoOp
+    | SocketInit String
     | ScanComplete
     | SocketError String
     | Log String
@@ -134,6 +135,9 @@ scanUpdateToString update =
     case update of
         NoOp ->
             "NoOp"
+
+        SocketInit _ ->
+            "SocketInit"
 
         ScanComplete ->
             "ScanComplete"
@@ -192,6 +196,9 @@ onlyJusts =
 scanUpdateFromDict : ( String, String ) -> Maybe ScanUpdate
 scanUpdateFromDict ( k, v ) =
     case k of
+        "SocketInit" ->
+            Just (SocketInit v)
+
         "ScanComplete" ->
             Just ScanComplete
 

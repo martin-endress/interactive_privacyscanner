@@ -1,3 +1,6 @@
 [podman]
 podman_socket = /run/user/1000/podman/podman.sock
 
+# see https://flask.palletsprojects.com/en/2.1.x/api/#flask.Flask.secret_key
+[flask]
+secret_key = 1337
