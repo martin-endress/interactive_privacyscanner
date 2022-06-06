@@ -17,8 +17,8 @@ function sendGuacamoleErrorMsg(msg) {
 }
 
 client.onstatechange = function (state) {
-    const state_msg = 'new state=' + state;
-    sendGuacamoleErrorMsg(state_msg);
+    //const state_msg = 'new state=' + state;
+    //sendGuacamoleErrorMsg(state_msg);
 }
 
 // Send errors to Elm port
@@ -94,25 +94,32 @@ function connectGuacamole(connection) {
 }
 
 // Init Websocket
-const socket = new WebSocket('ws://scanner.psi.test/ws/add_socket');
+var socket;
 
-// Event listeners
-socket.addEventListener("message", function (event) {
-    try {
-        app.ports.messageReceiver.send(JSON.parse(event.data));
-    } catch (SyntaxError) {
-        msg_json = { "SocketError": "Syntax error in socket message from server." }
-        app.ports.messageReceiver.send(msg_json)
-    }
-});
-socket.addEventListener("error", function (event) {
-    msg_json = { "SocketError": "Web socket ERROR, this should never happen lol." }
-    app.ports.messageReceiver.send(msg_json)
-});
-socket.addEventListener("close", function (event) {
-    msg_json = { "SocketError": "Websocket closed." }
-    app.ports.messageReceiver.send(msg_json)
-});
+function init_ws() {
+    socket = new WebSocket('ws://scanner.psi.test/ws/add_socket');
+    // Event listeners
+    socket.onopen = function (event) {
+        app.ports.messageReceiver.send({ "Log": "Web Socket opened."});
+    };
+    socket.onclose = function (event) {
+        app.ports.messageReceiver.send({ "SocketError": "Web Socket closed."});
+    };
+    socket.onmessage = function (event) {
+        try {
+            app.ports.messageReceiver.send(JSON.parse(event.data));
+        } catch (SyntaxError) {
+            msg_json = { "SocketError": "Syntax error in socket message from server." };
+            app.ports.messageReceiver.send(msg_json);
+        }
+    };
+    socket.onerror = function (event) {
+        msg_json = { "SocketError": "Web socket.error, this should never happen :( ." };
+        app.ports.messageReceiver.send(msg_json);
+    };
+}
+
+window.onload = init_ws;
 
 // disconnect from guacamole
 app.ports.disconnectTunnel.subscribe(function () {

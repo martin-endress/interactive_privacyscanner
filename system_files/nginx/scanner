@@ -52,10 +52,12 @@ server {
 }
 
 server {
-    listen 80;
-    listen [::]:80;
-
+    listen 443 ssl;
     server_name scanner.psi.test;
+
+    ssl_certificate      /etc/nginx/certs/cert.pem;
+    ssl_certificate_key  /etc/nginx/certs/key.pem;
+
     root /usr/lib/interactive_privacyscanner/frontend/target;
 
     # Frontend development server (e.g. elm-live)
@@ -71,11 +73,12 @@ server {
     # Websocket manager backend (same server)
     location /ws/ {
         proxy_pass http://localhost:9000/;
+        proxy_buffering off;
         proxy_http_version 1.1;
+        proxy_set_header Host $host;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "Upgrade";
-        proxy_buffering off;
-        proxy_set_header Host $host;
+        access_log off;
     }
 
     # guacamole backend

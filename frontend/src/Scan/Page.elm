@@ -43,7 +43,7 @@ type Msg
     | SetGuacamoleFocus Bool
     | StartScan
     | GotStartScan (Result (Error String) ( Metadata, ContainerStartInfo ))
-    | ConnectToGuacamole
+    | ConnectToGuacamole Connection
     | ReceiveScanUpdate ScanUpdate
     | RegisterInteraction
     | GotRequestResult (Maybe ScanState) (Result (Error Bytes) ())
@@ -95,25 +95,17 @@ update msg model =
         GotStartScan result ->
             processStartResult model result
 
-        ConnectToGuacamole ->
-            let
-                encodeConnection connection =
-                    E.object
-                        [ ( "vncPort", E.int connection.vncPort )
-                        , ( "containerId", E.string connection.containerId )
-                        ]
-            in
-            ( model
-            , model.connection
-                |> Maybe.map encodeConnection
-                |> Maybe.map Ports.connectTunnel
-                |> Maybe.withDefault Cmd.none
+        ConnectToGuacamole connection ->
+            ( appendLogEntry { msg = "Connecting to Guacamole...", level = Data.Info } model
+            , Ports.connectTunnel <|
+                E.object
+                    [ ( "vncPort", E.int connection.vncPort )
+                    , ( "containerId", E.string connection.containerId )
+                    ]
             )
 
         ReceiveScanUpdate scanUpdate ->
-            ( processScanUpdate scanUpdate model
-            , Cmd.none
-            )
+            processScanUpdate scanUpdate model
 
         RegisterInteraction ->
             ( model
@@ -197,7 +189,7 @@ processStartResult model result =
                 { model
                     | connection = Just connection
                 }
-            , Delay.after 3000 ConnectToGuacamole
+            , Delay.after 500 (ConnectToGuacamole connection)
             )
 
         Err error ->
@@ -208,47 +200,64 @@ processStartResult model result =
             )
 
 
-processScanUpdate : ScanUpdate -> Model -> Model
+processScanUpdate : ScanUpdate -> Model -> ( Model, Cmd Msg )
 processScanUpdate scanUpdate model =
     case ( scanUpdate, model.scanState ) of
         ( NoOp, _ ) ->
-            model
+            ( model, Cmd.none )
 
         ( SocketInit id, Idle ) ->
-            { model | socketId = Just id }
+            ( { model | socketId = Just id }, Cmd.none )
 
         ( ScanComplete, ScanInProgress ) ->
-            updateScanState
+            ( updateScanState
                 AwaitingInteraction
                 { model | interactionCount = model.interactionCount + 1 }
+            , Cmd.none
+            )
 
         ( ScanComplete, FinalScanInProgress ) ->
-            init
+            ( init, Cmd.none )
 
         ( SocketError message, _ ) ->
-            appendLogEntry
+            ( appendLogEntry
                 { msg = "Socket msg:" ++ message, level = Data.Error }
                 model
+            , Cmd.none
+            )
 
         ( GuacamoleMsg message, _ ) ->
-            appendLogEntry
+            let
+                cmd =
+                    case scanUpdate of
+                        GuacamoleMsg _ ->
+                            model.connection
+                                |> Maybe.map (\c -> Delay.after 500 (ConnectToGuacamole c))
+                                |> Maybe.withDefault Cmd.none
+
+                        _ ->
+                            Cmd.none
+            in
+            ( appendLogEntry
                 { msg = "Guacamole msg:" ++ message, level = Data.Warning }
                 model
+            , cmd
+            )
 
         ( Log message, _ ) ->
             let
                 entry =
                     { msg = message, level = Data.Info }
             in
-            appendLogEntry entry model
+            ( appendLogEntry entry model, Cmd.none )
 
         ( URLChanged newUrl, _ ) ->
             -- todo
-            { model | currentUrl = newUrl }
+            ( { model | currentUrl = newUrl }, Cmd.none )
 
         ( _, _ ) ->
             -- Illegal state
-            appendLogEntry
+            ( appendLogEntry
                 { msg =
                     "Illegal State. (msg="
                         ++ scanUpdateToString scanUpdate
@@ -258,6 +267,8 @@ processScanUpdate scanUpdate model =
                 , level = Data.Error
                 }
                 model
+            , Cmd.none
+            )
 
 
 processRequestResult : Result (Error Bytes) () -> Maybe ScanState -> Model -> Model
