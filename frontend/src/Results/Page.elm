@@ -1,5 +1,6 @@
 module Results.Page exposing (..)
 
+import Bytes exposing (Bytes)
 import Html exposing (Html, button, div, h2, text)
 import Html.Attributes exposing (attribute, class, id, style, type_)
 import Html.Events exposing (onClick)
@@ -27,6 +28,7 @@ type Msg
     | ViewScanner
     | ReplayScan String
     | GotReplayScan (Result (Error String) ( Metadata, Int ))
+    | DownloadResult String
 
 
 
@@ -76,6 +78,9 @@ update msg model =
 
                 Err _ ->
                     ( model, Cmd.none )
+
+        DownloadResult scanId ->
+            ( model, Requests.downloadResult scanId )
 
 
 
@@ -200,16 +205,25 @@ viewResultEntryBody scan =
                         |> List.map (\s -> viewScanEntry "recorded scan" s.success)
                    )
             )
-        , div [ class "row", class "m-2", class "p-0" ]
+        , div [ class "row", class "m-2", class "p-2" ]
             [ button
-                [ class "row"
+                [ class "col"
                 , class "btn"
+                , class "m-1"
                 , class "btn-primary"
-                , class "float-end"
                 , class "btn-sm"
                 , onClick (ReplayScan scan.id)
                 ]
                 [ text "Replay recorded scan" ]
+            , button
+                [ class "col"
+                , class "btn"
+                , class "m-1"
+                , class "btn-primary"
+                , class "btn-sm"
+                , onClick (DownloadResult scan.id)
+                ]
+                [ text "Download Scan" ]
             ]
         ]
 
@@ -231,11 +245,11 @@ viewScanEntry name success =
         , button
             [ class "col"
             , class "btn"
-            , class "btn-primary"
+            , class "btn-light"
             , class "float-end"
             , class "btn-sm"
             ]
-            [ text "View Results" ]
+            [ text "Show Result (WIP)" ]
         ]
 
 

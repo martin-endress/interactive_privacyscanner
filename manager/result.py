@@ -1,4 +1,5 @@
 import json
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -46,6 +47,7 @@ class Result:
 
     def __init__(self, result_dict, result_id, initial_scan):
         self._result_dict = result_dict
+        self.result_id = result_id
         self._result_path = (Path(RESULT_PATH) / result_id).resolve()
         self._current_scan_path = self.get_current_scan_path(initial_scan)
         self._file_handler = DirectoryFileHandler(self._current_scan_path)
@@ -173,8 +175,12 @@ def get_all_scans():
     for p in scan_path.iterdir():
         current_scan = {'id': p.name, 'replays': []}
         if not p.is_dir():
+            # .gitignore file
             continue
         for scan in p.iterdir():
+            if not scan.is_dir():
+                # e.g. result zip files
+                continue
             logger.debug(scan)
             success = scan_successful(scan)
             if scan.name == FIRST_SCAN:
@@ -183,6 +189,23 @@ def get_all_scans():
                 current_scan['replays'].append({'success': success})
         scans.append(current_scan)
     return scans
+
+
+def download_result(scan_id):
+    ZIP_EXTENSION = 'zip'
+    if not is_scan_id(scan_id):
+        raise ScannerError(f'Download failed, {scan_id} is not a scan id.')
+    # store result inside folder
+    shutil.make_archive(Path(RESULT_PATH) / scan_id / scan_id, ZIP_EXTENSION, Path(RESULT_PATH) / scan_id)
+    return f'{scan_id}/{scan_id}.zip'
+
+
+def is_scan_id(scan_id):
+    scan_path = Path(RESULT_PATH)
+    for s in scan_path.iterdir():
+        if s.name == scan_id:
+            return True
+    return False
 
 
 def scan_successful(path):

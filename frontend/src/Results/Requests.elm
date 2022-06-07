@@ -1,7 +1,9 @@
-module Results.Requests exposing (getAllScans, replayScan)
+module Results.Requests exposing (downloadResult, getAllScans, replayScan)
 
+import Bytes exposing (Bytes)
+import File.Download as Download
 import Http exposing (Metadata)
-import Http.Detailed exposing (Error, expectJson)
+import Http.Detailed exposing (Error, expectBytes, expectJson)
 import Json.Decode as D
 import Json.Encode as E
 import Requests exposing (managerApi)
@@ -30,3 +32,8 @@ replayScan m resultId =
                     [ ( "result_id", E.string resultId ) ]
         , expect = expectJson m resultDecoder
         }
+
+
+downloadResult : String -> Cmd msg
+downloadResult resultId =
+    Download.url <| managerApi "result" ++ "/" ++ resultId

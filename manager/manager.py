@@ -3,7 +3,7 @@ import logging
 import secrets
 from urllib.parse import urlparse
 
-from flask import Flask, Response, request
+from flask import Flask, Response, request, send_from_directory
 from flask_sock import Sock
 from podman.errors import PodmanError
 
@@ -177,6 +177,15 @@ def get_all_scans():
     scans = result.get_all_scans()
     response_body = json.dumps(scans, sort_keys=True)
     return Response(response_body, status=200)
+
+
+@app.route("/result/<path:scan_id>")
+def download_file(scan_id):
+    logger.info(f'requested folder {scan_id}')
+    path = result.download_result(scan_id)
+    return send_from_directory(
+        result.RESULT_PATH, path, as_attachment=True
+    )
 
 
 @app.route('/replay_scan', methods=['POST'])
