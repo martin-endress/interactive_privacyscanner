@@ -196,7 +196,7 @@ def download_result(scan_id):
     if not is_scan_id(scan_id):
         raise ScannerError(f'Download failed, {scan_id} is not a scan id.')
     # store result inside folder
-    shutil.make_archive(Path(RESULT_PATH) / scan_id / scan_id, ZIP_EXTENSION, Path(RESULT_PATH) / scan_id)
+    shutil.make_archive(Path(RESULT_PATH) / scan_id, ZIP_EXTENSION, Path(RESULT_PATH) / scan_id)
     return f'{scan_id}.zip'
 
 
