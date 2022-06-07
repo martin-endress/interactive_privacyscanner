@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 from podman import PodmanClient
 from podman.errors import PodmanError, BuildError, NotFound, APIError
@@ -11,6 +12,9 @@ VNC_PORT = 5900
 DEVTOOLS_PORT = 9000
 
 PODMAN_SOCKET_URI = "unix://" + config.podman['podman_socket']
+
+# max lifetime in seconds (30 Minutes)
+CONTAINER_MAX_LIFETIME = 60 * 30
 
 logger = logs.get_logger('podman_api')
 
@@ -94,6 +98,20 @@ def podman_available():
     except APIError as e:
         logger.error('Error %s' % str(e))
         return False
+
+
+def kill_old_containers():
+    containers = podman_client.containers.list()
+    for c in containers:
+        started_at = c.inspect()['State']['StartedAt']
+        # StartedAt does not conform to ISO date, but it has 8 instead of 6 microsecond digits
+        # e.g. '2022-06-07T15:18:51.949951782+02:00'
+        iso_started_at = started_at[:started_at.find('.')]
+        run_time = datetime.now() - datetime.fromisoformat(iso_started_at)
+        if run_time.seconds > CONTAINER_MAX_LIFETIME:
+            logger.warn(f'Container {c.id} reached its max age (30 minutes) and was shut down.')
+            c.stop()
+            c.remove()
 
 
 def _get_host_ports(container):

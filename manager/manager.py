@@ -1,8 +1,10 @@
+import atexit
 import json
 import logging
 import secrets
 from urllib.parse import urlparse
 
+from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask, Response, request, send_from_directory
 from flask_sock import Sock
 from podman.errors import PodmanError
@@ -13,7 +15,7 @@ import result
 import scanner_messages
 from errors import ScannerError
 from interactive_scanner import InteractiveScanner
-from podman_container import run_container, podman_available, stop_container
+from podman_container import run_container, podman_available, stop_container, kill_old_containers
 from result import ResultKey
 from scanner_messages import ScannerMessage, MessageType
 
@@ -31,6 +33,13 @@ app = Flask(__name__)
 app.secret_key = config.flask['secret_key']
 
 sock = Sock(app)
+
+# Init CRON Job, see kill_old_containers
+scheduler = BackgroundScheduler()
+scheduler.add_job(func=kill_old_containers, trigger="interval", seconds=60)
+scheduler.start()
+# Stop scheduler at exist
+atexit.register(lambda: scheduler.shutdown())
 
 
 @app.before_request

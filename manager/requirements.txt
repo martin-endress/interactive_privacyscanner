@@ -1,4 +1,5 @@
-Flask==2.1.2
+APScheduler==3.9.1
+Flask==2.1.1
 flask_sock==0.5.2
 janus==1.0.0
 playwright==1.21.0
