@@ -2,6 +2,7 @@
 
 bin/
 /manager/results
+/manager/download
 /manager/logs
 /manager/manager.cfg
 /guacamole_backend/target/
