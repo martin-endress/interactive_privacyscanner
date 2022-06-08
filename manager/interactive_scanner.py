@@ -111,7 +111,7 @@ class InteractiveScanner(Thread):
             case ScannerMessage(message_type=MessageType.PerformUserInteraction):
                 await self._perform_user_interaction(message.content)
             case ScannerMessage(message_type=MessageType.StopScan):
-                await self._stop_scan()
+                await self._stop_scan(message.content)
                 # send poison pill
                 return True
             case unknown_command:
@@ -195,10 +195,10 @@ class InteractiveScanner(Thread):
         self.result.num_screenshots += 1
         self.send_socket_msg({"Log": "Screenshot saved."})
 
-    async def _stop_scan(self):
+    async def _stop_scan(self, note):
         await self.browser.ignore_inputs(True)
         await self._record_information(ResultKey.END_SCAN)
-        self.result.store_result()
+        self.result.store_result(note=note)
 
     # Callback Functions
 

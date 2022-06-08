@@ -116,7 +116,10 @@ def stop_scan():
     logging.debug('/stop_scan')
     try:
         scanner = get_scanner()
-        scanner.put_msg(ScannerMessage(MessageType.StopScan))
+        note = None
+        if 'scan_note' in request.json:
+            note = request.json['scan_note']
+        scanner.put_msg(ScannerMessage(MessageType.StopScan, content=note))
         return Response('Scan completion initiated.', status=200)
     except PodmanError as e:
         return Response('Server Error: %s' % str(e), status=500)

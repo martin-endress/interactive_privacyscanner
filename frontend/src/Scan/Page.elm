@@ -2,8 +2,8 @@ module Scan.Page exposing (..)
 
 import Bytes exposing (Bytes)
 import Delay
-import Html exposing (Html, button, div, h4, input, text)
-import Html.Attributes exposing (attribute, class, disabled, style)
+import Html exposing (Html, b, button, div, h4, input, text, textarea)
+import Html.Attributes exposing (attribute, class, disabled, style, value)
 import Html.Events exposing (onClick, onInput, onMouseEnter, onMouseLeave)
 import Http exposing (Metadata)
 import Http.Detailed exposing (Error)
@@ -25,6 +25,7 @@ type alias Model =
     , connection : Maybe Connection
     , interactionCount : Int
     , urlInput : String
+    , noteInput : String
     , currentUrl : String
     , guacamoleFocus : Bool
     , log : List LogEntry
@@ -44,6 +45,7 @@ type Msg
     | GotStartScan (Result (Error String) ( Metadata, ContainerStartInfo ))
     | ConnectToGuacamole Connection
     | ReceiveScanUpdate ScanUpdate
+    | UpdateNoteInput String
     | RegisterInteraction
     | GotRequestResult (Maybe ScanState) (Result (Error Bytes) ())
     | FinishScan
@@ -64,6 +66,22 @@ init =
     , interactionCount = 0
     , currentUrl = ""
     , urlInput = ""
+    , noteInput = ""
+    , guacamoleFocus = False
+    , log = []
+    }
+
+
+clearModel : Model -> Model
+clearModel oldModel =
+    -- clear model for everything except socket id (allow for repeated scans)
+    { scanState = Idle
+    , socketId = oldModel.socketId
+    , connection = Nothing
+    , interactionCount = 0
+    , currentUrl = ""
+    , urlInput = ""
+    , noteInput = ""
     , guacamoleFocus = False
     , log = []
     }
@@ -106,11 +124,17 @@ update msg model =
         ReceiveScanUpdate scanUpdate ->
             processScanUpdate scanUpdate model
 
+        UpdateNoteInput newNoteInput ->
+            ( { model | noteInput = newNoteInput }
+            , Cmd.none
+            )
+
         RegisterInteraction ->
             ( model
             , model.connection
                 |> Maybe.map .containerId
-                |> Maybe.map (Requests.registerUserInteraction <| GotRequestResult (Just ScanInProgress))
+                |> Maybe.map
+                    (Requests.registerUserInteraction (GotRequestResult (Just ScanInProgress)))
                 |> Maybe.withDefault Cmd.none
             )
 
@@ -120,7 +144,7 @@ update msg model =
             )
 
         FinishScan ->
-            ( model
+            ( clearModel model
             , finishScanCommands model
             )
 
@@ -128,7 +152,8 @@ update msg model =
             ( model
             , model.connection
                 |> Maybe.map .containerId
-                |> Maybe.map (Requests.takeScreenshot <| GotRequestResult Nothing)
+                |> Maybe.map
+                    (Requests.takeScreenshot (GotRequestResult Nothing))
                 |> Maybe.withDefault Cmd.none
             )
 
@@ -136,7 +161,8 @@ update msg model =
             ( model
             , model.connection
                 |> Maybe.map .containerId
-                |> Maybe.map (Requests.clearBrowserCookies <| GotRequestResult (Just ScanInProgress))
+                |> Maybe.map
+                    (Requests.clearBrowserCookies (GotRequestResult (Just ScanInProgress)))
                 |> Maybe.withDefault Cmd.none
             )
 
@@ -167,7 +193,11 @@ finishScanCommands model =
         finishCmd =
             model.connection
                 |> Maybe.map .containerId
-                |> Maybe.map (Requests.finishScan <| GotRequestResult (Just FinalScanInProgress))
+                |> Maybe.map
+                    (Requests.finishScan
+                        (GotRequestResult (Just FinalScanInProgress))
+                        model.noteInput
+                    )
                 |> Maybe.withDefault Cmd.none
     in
     Cmd.batch [ finishCmd, Ports.disconnectTunnel () ]
@@ -215,7 +245,7 @@ processScanUpdate scanUpdate model =
             )
 
         ( ScanComplete, FinalScanInProgress ) ->
-            ( init, Cmd.none )
+            ( clearModel model, Cmd.none )
 
         ( SocketError message, _ ) ->
             ( appendLogEntry
@@ -331,14 +361,29 @@ viewStatusPanel model =
         , class "d-flex"
         , class "flex-column"
         ]
-        [ h4 [ class "m-3", class "text-center" ] [ text "Interactive Privacyscanner" ]
+        [ h4
+            [ class "m-3", class "text-center" ]
+            [ text "Interactive Privacyscanner" ]
         , viewStartInput model
-        , View.viewDescriptionText "Status" <| Data.stateToString model.scanState
-        , View.viewDescriptionText "Current URL" model.currentUrl
-        , View.viewDescriptionText "Interactions" <| String.fromInt model.interactionCount
-        , viewButtons (model.scanState == AwaitingInteraction)
+        , div [ class "container", class "m-2", class "px-1" ]
+            [ View.viewDescriptionText
+                "Status"
+                (Data.stateToString model.scanState)
+            , View.viewDescriptionText
+                "Current URL"
+                model.currentUrl
+            , View.viewDescriptionText
+                "Interactions"
+                (String.fromInt model.interactionCount)
+            ]
+        , viewButtons model
         , View.viewLog model.log
-        , div [ class "row", class "justify-content-center", class "flex-grow-1" ] []
+        , div
+            [ class "row"
+            , class "justify-content-center"
+            , class "flex-grow-1"
+            ]
+            []
         , div [ class "container", class "m-1" ]
             [ div
                 [ class "row" ]
@@ -366,8 +411,9 @@ viewStartInput model =
                     "placeholder"
                     "Enter a URL to perform an interactive scan"
                 , onInput UpdateUrlInput
+                , value model.urlInput
                 ]
-                [ text model.urlInput ]
+                []
             , button
                 [ class "btn btn-primary"
                 , attribute "type" "button"
@@ -378,8 +424,12 @@ viewStartInput model =
         ]
 
 
-viewButtons : Bool -> Html Msg
-viewButtons awaitingInteraction =
+viewButtons : Model -> Html Msg
+viewButtons model =
+    let
+        awaitingInteraction =
+            model.scanState == AwaitingInteraction
+    in
     div [ class "container", class "m-1" ]
         [ div
             [ class "row" ]
@@ -413,6 +463,30 @@ viewButtons awaitingInteraction =
                 , disabled <| not awaitingInteraction
                 ]
                 [ text "Register User Interaction" ]
+            ]
+        , div
+            [ class "container"
+            , class "mx-0"
+            , class "px-0"
+            , class "py-1"
+            ]
+            [ b
+                [ class "row"
+                , class "mx-0"
+                , class "p-0"
+                , class "w-100"
+                ]
+                [ text "Scan Notes" ]
+            , textarea
+                [ class "row"
+                , class "mx-0"
+                , class "px-0"
+                , attribute "rows" "4"
+                , attribute "cols" "60"
+                , value model.noteInput
+                , onInput UpdateNoteInput
+                ]
+                []
             ]
         , div
             [ class "row" ]

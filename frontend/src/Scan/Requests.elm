@@ -41,14 +41,16 @@ registerUserInteraction m containerId =
         }
 
 
-finishScan : (Result (Error Bytes) () -> msg) -> String -> Cmd msg
-finishScan m containerId =
+finishScan : (Result (Error Bytes) () -> msg) -> String -> String -> Cmd msg
+finishScan m note containerId =
     Http.post
         { url = managerApi "stop_scan"
         , body =
             Http.jsonBody <|
                 E.object
-                    [ ( "container_id", E.string containerId ) ]
+                    [ ( "container_id", E.string containerId )
+                    , ( "scan_note", E.string note )
+                    ]
         , expect = expectWhatever m
         }
 

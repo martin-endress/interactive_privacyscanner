@@ -138,7 +138,9 @@ class Result:
     def get_results(self):
         return self._result_dict
 
-    def store_result(self):
+    def store_result(self, note=None):
+        if note:
+            self['user_note'] = note
         result_file = self._current_scan_path / RESULT_FILENAME
         try:
             with result_file.open("w") as f:

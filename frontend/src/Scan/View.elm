@@ -66,7 +66,7 @@ viewDescriptionText description value =
 
 viewDescription : String -> Maybe (Html msg) -> Html msg
 viewDescription description item =
-    dl [ class "row", class "m-1" ]
+    dl [ class "row", class "m-0" ]
         [ dt [ class "col-sm-3" ] [ text description ]
         , dd [ class "col-sm-9" ] [ item |> Maybe.withDefault (text "-") ]
         ]
