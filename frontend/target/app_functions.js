@@ -81,13 +81,6 @@ app.ports.connectTunnel.subscribe(function (connection) {
     connectGuacamole(connection);
 });
 
-// Change the URL upon request, inform app of the change.
-app.ports.pushUrl.subscribe(function (url) {
-    window.location.hash = url;
-    history.pushState({}, '', url);
-    app.ports.onUrlChange.send(location.href);
-});
-
 function connectGuacamole(connection) {
     param = "port=" + connection.vncPort.toString()
     client.connect(param);

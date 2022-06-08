@@ -10,7 +10,6 @@ import Http.Detailed exposing (Error)
 import Json.Encode as E
 import Maybe
 import Ports
-import Route exposing (Route(..))
 import Scan.Data as Data exposing (ContainerStartInfo, LogEntry, ScanState(..), ScanUpdate(..), scanUpdateToString)
 import Scan.Requests as Requests
 import Scan.View as View
@@ -142,9 +141,8 @@ update msg model =
             )
 
         ViewResults ->
-            ( model
-            , Route.modifyUrl Results
-            )
+            -- handled in Main
+            ( model, Cmd.none )
 
 
 startScan : Model -> ( Model, Cmd Msg )

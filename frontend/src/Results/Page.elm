@@ -1,6 +1,5 @@
 module Results.Page exposing (..)
 
-import Bytes exposing (Bytes)
 import Html exposing (Html, button, div, h2, text)
 import Html.Attributes exposing (attribute, class, id, style, type_)
 import Html.Events exposing (onClick)
@@ -8,7 +7,6 @@ import Http exposing (Metadata)
 import Http.Detailed exposing (Error)
 import Results.Data exposing (ScanInfo)
 import Results.Requests as Requests
-import Route exposing (Route(..))
 
 
 
@@ -62,11 +60,6 @@ update msg model =
                 Err _ ->
                     ( model, Cmd.none )
 
-        ViewScanner ->
-            ( model
-            , Route.modifyUrl Scanner
-            )
-
         ReplayScan scanId ->
             ( model, Requests.replayScan GotReplayScan scanId )
 
@@ -85,6 +78,10 @@ update msg model =
 
         DownloadAllResults ->
             ( model, Requests.downloadAllResults )
+
+        ViewScanner ->
+            -- handled in Main
+            ( model, Cmd.none )
 
 
 

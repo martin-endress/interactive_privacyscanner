@@ -1,4 +1,4 @@
-port module Ports exposing (connectTunnel, disconnectTunnel, messageReceiver, onUrlChange, pushUrl, setGuacamoleFocus)
+port module Ports exposing (connectTunnel, disconnectTunnel, messageReceiver, onUrlChange, setGuacamoleFocus)
 
 import Json.Decode as D
 import Json.Encode as E
@@ -14,9 +14,6 @@ port setGuacamoleFocus : Bool -> Cmd msg
 
 
 port onUrlChange : (String -> msg) -> Sub msg
-
-
-port pushUrl : String -> Cmd msg
 
 
 port messageReceiver : (D.Value -> msg) -> Sub msg
