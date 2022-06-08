@@ -29,6 +29,7 @@ type Msg
     | ReplayScan String
     | GotReplayScan (Result (Error String) ( Metadata, Int ))
     | DownloadResult String
+    | DownloadAllResults
 
 
 
@@ -82,6 +83,9 @@ update msg model =
         DownloadResult scanId ->
             ( model, Requests.downloadResult scanId )
 
+        DownloadAllResults ->
+            ( model, Requests.downloadAllResults )
+
 
 
 -- VIEW
@@ -112,6 +116,15 @@ viewStatusPanel model =
             [ div
                 [ class "col" ]
                 [ text <| "#Scans:" ++ String.fromInt (List.length model.scanList) ]
+            , div [ class "col" ]
+                [ button
+                    [ class "btn"
+                    , class "btn-primary"
+                    , class "btn-sm"
+                    , onClick DownloadAllResults
+                    ]
+                    [ text "Download All Results" ]
+                ]
             , div
                 [ class "col" ]
                 [ button
@@ -125,9 +138,21 @@ viewStatusPanel model =
                     ]
                 ]
             ]
-        , viewResultList model.scanList
-        , div [ class "row", class "justify-content-center", class "flex-grow-1" ] []
-        , div [ class "container", class "m-1" ]
+        , div
+            [ class "row"
+            , class "overflow-auto"
+            , class "py-2"
+            , style "max-height" "50%"
+            ]
+            [ viewResultList model.scanList ]
+        , div
+            [ class "row"
+            , class "justify-content-center"
+            , class "flex-grow-1"
+            ]
+            []
+        , div
+            [ class "container", class "m-1" ]
             [ div
                 [ class "row" ]
                 [ button
@@ -148,9 +173,6 @@ viewResultList scans =
     div
         [ class "accordion"
         , id "resultAccordion"
-        , style "max-height" "50%"
-        , class "overflow-auto"
-        , class "row"
         , class "w-100"
         ]
         (scans

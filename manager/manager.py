@@ -191,9 +191,18 @@ def get_all_scans():
 @app.route("/result/<path:scan_id>")
 def download_file(scan_id):
     logger.info(f'requested folder {scan_id}')
-    path = result.download_result(scan_id)
+    path = result.archive_result(scan_id)
     return send_from_directory(
-        result.RESULT_PATH, path, as_attachment=True
+        result.DOWNLOAD_PATH, path, as_attachment=True
+    )
+
+
+@app.route("/results")
+def download_results():
+    logger.info('requested all results')
+    path = result.archive_all_results()
+    return send_from_directory(
+        result.DOWNLOAD_PATH, path, as_attachment=True
     )
 
 
