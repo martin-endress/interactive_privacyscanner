@@ -27,7 +27,7 @@ class InteractiveScanner(Thread):
         # Mark this thread as daemon
         self.daemon = True
 
-        self.logger = logs.get_logger('cdp_controller_%s' % self.name)
+        self.logger = logs.get_logger(f'cdp_controller_{self.name}')
 
         # Init Message Queue
         self.event_loop = asyncio.new_event_loop()
@@ -93,6 +93,14 @@ class InteractiveScanner(Thread):
                     self.result[ResultKey.ERROR] = error_msg
                     self.result.store_result()
                     break
+                except Exception as e:
+                    # TODO inform user about abort (see #29)
+                    error_msg = str(e)
+                    # include stack trace
+                    self.logger.error(error_msg, exc_info=e)
+                    self.result[ResultKey.ERROR] = error_msg
+                    self.result.store_result()
+                    break
         # Stop container after disconnecting from browser
         podman_container.stop_container(self.container_id)
         self.send_socket_msg({"ScanComplete": ""})
@@ -148,6 +156,7 @@ class InteractiveScanner(Thread):
         await self.browser.cpd_send_message("BackgroundService.startObserving", service="backgroundFetch")
 
     async def _record_information(self, reason):
+        await self.browser.wait_for_document_loaded()
         target_info = await self.browser.cpd_send_message('Target.getTargetInfo')
         url = target_info["targetInfo"]["url"]
         url_parsed = urlparse(url)
@@ -223,7 +232,7 @@ class InteractiveScanner(Thread):
             interaction_json = json.loads(msg_text[len(SCANNER_KEY):])
             self._page.add_interaction(interaction_json)
         else:
-            logger.debug('console message: ' + msg_text)
+            # logger.debug('console message: ' + msg_text)
             pass  # ignore other messages
 
     # Callback Definition

@@ -229,14 +229,15 @@ def filter_dict(d, keys):
 
 def get_result_id(netloc):
     now = datetime.now().strftime("%y-%m-%d_%H-%M")
-    return "%s_%s" % (utils.slugify(netloc), now)
+    return f"{utils.slugify(netloc)}_{now}"
 
 
 async def parse_request(request):
     return {"url": request.url,
             "method": request.method,
             "headers": await request.all_headers(),
-            "post_data": request.post_data}
+            "post_data": request.post_data,
+            "document_url": request.frame.url}
 
 
 async def parse_response(response):

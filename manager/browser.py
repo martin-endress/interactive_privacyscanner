@@ -11,6 +11,13 @@ logger = logs.get_logger('chrome_api')
 SCREENSHOT_QUALITY = 80
 INIT_JS_PATH = "https://cdn.jsdelivr.net/gh/martin-endress/interactive_privacyscanner@record-interaction/manager/tmp/init.js"
 
+# 1 second
+MIN_SLEEP_TIME = 1
+# 10 seconds
+DOCUMENT_LOADED_TIMEOUT = 10 * 1000
+# 5 seconds
+NETWORK_IDLE_TIMEOUT = 5 * 1000
+
 
 class Browser:
     def __init__(self, debugging_port, files_path):
@@ -83,6 +90,15 @@ class Browser:
 
     async def ignore_inputs(self, ignore):
         await self.cpd_send_message('Input.setIgnoreInputEvents', ignore=ignore)
+
+    async def wait_for_document_loaded(self):
+        await asyncio.sleep(MIN_SLEEP_TIME)
+        try:
+            await self._page.wait_for_load_state(state='domcontentloaded', timeout=DOCUMENT_LOADED_TIMEOUT)
+            # networkidle = no request for 500ms
+            await self._page.wait_for_load_state(state='networkidle', timeout=NETWORK_IDLE_TIMEOUT)
+        except async_api.TimeoutError as e:
+            logger.info(f'Load state timeout exceeded: {e}')
 
     async def perform_user_interaction(self, interaction):
         # user interaction event is defined through 'event' and 'selector'

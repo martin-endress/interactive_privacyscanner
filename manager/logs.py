@@ -8,7 +8,7 @@ FILE_LEVEL = logging.INFO
 
 def configure(file_name):
     # create handlers
-    log_filename = 'logs/%s' % file_name
+    log_filename = f'logs/{file_name}'
     fh = RotatingFileHandler(filename=log_filename, backupCount=10, maxBytes=50000)
     fh.setLevel(FILE_LEVEL)
 

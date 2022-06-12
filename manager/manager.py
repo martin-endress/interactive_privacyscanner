@@ -106,7 +106,7 @@ def register_interaction():
     try:
         scanner = get_scanner()
     except ValueError as e:
-        return Response('Client Error: %s' % str(e), status=400)
+        return Response(f'Client Error: {e}', status=400)
     scanner.put_msg(ScannerMessage(MessageType.RegisterInteraction))
     return Response(status=200)
 
@@ -122,9 +122,9 @@ def stop_scan():
         scanner.put_msg(ScannerMessage(MessageType.StopScan, content=note))
         return Response('Scan completion initiated.', status=200)
     except PodmanError as e:
-        return Response('Server Error: %s' % str(e), status=500)
+        return Response(f'Server Error: {e}', status=500)
     except ValueError as e:
-        return Response('Client Error: %s' % str(e), status=400)
+        return Response(f'Client Error: {e}', status=400)
 
 
 @app.route('/clear_cookies', methods=['POST'])
@@ -134,9 +134,9 @@ def clear_cookies():
         scanner.put_msg(ScannerMessage(MessageType.ClearCookies))
         return Response('Cookies deleted.', status=200)
     except PodmanError as e:
-        return Response('Server Error: %s' % str(e), status=500)
+        return Response(f'Server Error: {e}', status=500)
     except ValueError as e:
-        return Response('Client Error: %s' % str(e), status=400)
+        return Response(f'Client Error: {e}' , status=400)
 
 
 @app.route('/take_screenshot', methods=['POST'])
@@ -146,9 +146,9 @@ def take_screenshot():
         scanner.put_msg(ScannerMessage(MessageType.TakeScreenshot))
         return Response('Screenshot saved.', status=200)
     except PodmanError as e:
-        return Response('Server Error: %s' % str(e), status=500)
+        return Response(f'Server Error: {e}', status=500)
     except ValueError as e:
-        return Response('Client Error: %s' % str(e), status=400)
+        return Response(f'Client Error: {e}', status=400)
 
 
 @sock.route('/add_socket')
@@ -178,9 +178,9 @@ def stop_all_scans():
             stop_container(c_id)
             scanner.put_msg(ScannerMessage(MessageType.StopScan))
         except PodmanError as e:
-            return Response('Server Error: %s' % str(e), status=500)
+            return Response(f'Server Error: {e}', status=500)
         except ValueError as e:
-            return Response('Client Error: %s' % str(e), status=400)
+            return Response(f'Client Error: {e}', status=400)
     return Response('Shutdown successful.', status=200)
 
 
@@ -267,4 +267,4 @@ def get_scanner():
     if container_id in scanners:
         return scanners[container_id]
     else:
-        raise ValueError("Container with id %d does not exist." % container_id)
+        raise ValueError(f"Container with id {container_id} does not exist.")

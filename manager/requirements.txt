@@ -5,3 +5,4 @@ janus==1.0.0
 playwright==1.21.0
 podman==4.0.0
 gunicorn==20.1.0
+adblockeval==0.3

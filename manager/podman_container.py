@@ -69,10 +69,10 @@ def run_container():
     if container.status != "running":
         raise PodmanError('Container is not running.')
 
-    logger.info("Started new container instance. (container id=%s)" % container.id)
+    logger.info(f"Started new container instance. (container id={container.id})")
     ports = _get_host_ports(container)
     if VNC_PORT not in ports or DEVTOOLS_PORT not in ports:
-        raise PodmanError("Container port mapping invalid. (status=%s)" % container.status)
+        raise PodmanError(f"Container port mapping invalid. (status={container.status})")
 
     return Container(container.id, container.name, container.labels, ports[VNC_PORT], ports[DEVTOOLS_PORT])
 
@@ -96,7 +96,7 @@ def podman_available():
     try:
         return podman_client.ping()
     except APIError as e:
-        logger.error('Error %s' % str(e))
+        logger.error(f'Error {e}')
         return False
 
 

@@ -1,59 +1,85 @@
 import asyncio
 import json
-from pathlib import Path
 from urllib.parse import urlparse
 
+from adblockeval import rules
 from playwright.async_api import async_playwright, TimeoutError
 
 import result
 
+rule_files = ['resources/easylist.txt', 'resources/easyprivacy.txt', 'resources/fanboy-annoyance.txt']
+rule_checker = rules.AdblockRules(rule_files=rule_files, skip_parsing_errors=True)
+
 
 def analyze_interactions():
-    scan_path = Path(result.RESULT_PATH)
-    for result_folder in scan_path.iterdir():
+    for result_folder in result.RESULT_PATH.iterdir():
         if not result_folder.is_dir():
             print(f'{result_folder.name} skipped.')
             continue
-        print(f'Analyzing result {result_folder.name}...')
+        print(f'Analysis of {result_folder.name}:')
         first_result_json_path = result_folder / result.FIRST_SCAN / result.RESULT_FILENAME
         with open(first_result_json_path) as f:
             r = json.load(f)
 
             scan_domain = str(urlparse(r[result.ResultKey.SITE_URL]).netloc)
+            # cut off www
             if scan_domain.startswith('www.'):
                 scan_domain = scan_domain[len('www.'):]
 
             interaction = r[result.ResultKey.INTERACTION]
             if len(interaction) != 2:
-                print('Error! Two interactions required.')
+                print(f'{result_folder.name} skipped. (unexpected number of interactions: {len(interaction)})')
                 continue
+            analyze_interaction(scan_domain, interaction[0], interaction[1])
 
-            before_click = interaction[0]
-            print('before')
-            print(get_third_parties_c(scan_domain, before_click['cookies']))
-            print(get_third_parties_r(scan_domain, before_click['requests']))
+        print()
 
-            after_click = interaction[1]
-            print('after')
-            print(get_third_parties_c(scan_domain, after_click['cookies']))
-            print(get_third_parties_r(scan_domain, after_click['requests']))
+
+def contains_tracker(urls):
+    return any(map(lambda x: x[1], urls))
+
+
+def analyze_interaction(scan_domain, interaction_before, interaction_after):
+    print(f' Cookie Analysis:')
+    tp_cookies_before = get_third_parties_c(scan_domain, interaction_before['cookies'])
+    tp_cookies_after = get_third_parties_c(scan_domain, interaction_after['cookies'])
+    print(f'   TP tracking cookie domains before (n={len(tp_cookies_before)}): {tp_cookies_before}')
+    print(f'   TP tracking cookie domains after (n={len(tp_cookies_after)}): {tp_cookies_after}')
+
+    print(f' TP request Analysis:')
+    tp_requests_before = get_third_parties_r(scan_domain, interaction_before['requests'])
+    tracking_tp_before = {k for k, v in tp_requests_before.items() if contains_tracker(v)}
+    tp_requests_after = get_third_parties_r(scan_domain, interaction_after['requests'])
+    tracking_tp_after = {k for k, v in tp_requests_after.items() if contains_tracker(v)}
+
+    new_tp = tracking_tp_after - tracking_tp_before
+    print(f'   TP before:{len(tracking_tp_before)} / {len(tp_requests_before)} (trackers / total TPs)')
+    print(f'   TP after: {len(tracking_tp_after)} / {len(tp_requests_after)}')
+    print(f'   trackers before (n={len(tracking_tp_before)}):\n{tracking_tp_before}')
+    print(f'   trackers after (n={len(tracking_tp_after)}):\n{tracking_tp_after}')
+    print(f'   additional trackers (n={len(new_tp)}):\n{new_tp}')
+    print()
 
 
 def get_third_parties_c(first_party, cookies):
     cookies_parties = set()
     for c in cookies:
-        d = c['domain']
-        if not d.endswith(first_party):
-            cookies_parties.add(c['domain'])
+        domain = c['domain']
+        if not domain.endswith(first_party) and rule_checker.match(domain, first_party).is_match:
+            cookies_parties.add(domain)
     return cookies_parties
 
 
 def get_third_parties_r(first_party, requests):
-    requests_parties = set()
+    requests_parties = dict()
     for r in requests:
-        net_loc = str(urlparse(r['url']).netloc)
+        url = r['url']
+        net_loc = str(urlparse(url).netloc)
         if not net_loc.endswith(first_party):
-            requests_parties.add(net_loc)
+            if net_loc not in requests_parties:
+                requests_parties[net_loc] = set()
+            tracker = rule_checker.match(url[:150], r['document_url']).is_match
+            requests_parties[net_loc].add((url, tracker))
     return requests_parties
 
 
