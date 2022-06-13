@@ -2,6 +2,7 @@
 
 bin/
 /manager/results
+/manager/resources
 /manager/download
 /manager/logs
 /manager/manager.cfg
