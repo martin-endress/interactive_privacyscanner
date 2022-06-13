@@ -233,10 +233,16 @@ def get_result_id(netloc):
 
 
 async def parse_request(request):
+    post_data = "decoding of post data failed"
+    try:
+        post_data = request.post_data
+    except UnicodeDecodeError as e:
+        logger.warning(e, exc_info=True)
+
     return {"url": request.url,
             "method": request.method,
             "headers": await request.all_headers(),
-            "post_data": request.post_data,
+            "post_data": post_data,
             "document_url": request.frame.url}
 
 
