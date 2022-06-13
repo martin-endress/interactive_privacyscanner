@@ -1,47 +1,87 @@
 ## Evaluation Konzept: Third Party Tracking auf .de domains
 
-Analyse von `.de` domains auf Tracking Eigenschaften vor und nach Einwilligung des Consent Banners (sofern vorhanden).
+Analyse von `.de` domains auf Tracking Eigenschaften vor und nach Einwilligung des Consent Banners.
 
-### Auswahl
+### Auswahl Seiten
 Beispielsweise Top 100 `.de` domains der [tranco-list](https://tranco-list.eu/), oder random sample von top 1k.
 
 ### Vorgehen
-Beim Besuch der Seite werden gesetzte Cookies und third party requests aufgezeichnet und nach bekannten Tracker untersucht.
-Die gesetzten Cookies und third party requests werden jeweils vor und nach der Einwilligung des consent Banners, falls vorhanden, gespeichert.
+Beim Besuch der Seite werden gesetzte Cookies und third party requests sowie JS Funktionsaufrufe aufgezeichnet.
+Unterschieden wird zwischen Cookies, requests und Funktionsaufrufen vor und nach der Einwilligung des Banners, sofern dieser vorhanden ist.
 Das eventuelle Fehlen des Banners wird als Notiz vermerkt.
-Für die Klassifizierung der Requests und Cookies wird [adblockeval](https://github.com/hprid/adblockeval) mithilfe der Tracking Datenbanken EasyList und EasyPrivacy verwendet.
 
-### Fragestellung
-- Welche der third party requests vor (bzw. nach) user consent sind tracker?
-- Welche kamen nach dem consent erst hinzu?
+### Auswertung
+
+Die Auswertung ist in Teilen eine Replikation des [ConsentGuard](https://gitlab.com/papamano/consent-guard/) Paper von Papadogiannakis und anderen (2021).
+
+Die Auswertung soll folgende Fragen beantworten:
+- Welche der third party requests sowie der gesetzten Cookies vor (bzw. nach) Nutzer Einwilligung sind tracker (tracking Kontext)?
+  - Welche requests kamen erst nach der Einwilligung hinzu?
 - Gibt es einen Cookie Banner?
+- Gibt es vor Einwilligung tracking ID leaks? 
+- Gibt es vor Einwilligung bereits Funktionsaufrufe die im Tracking Kontext stehen? (siehe [fingerprinting.js](https://gitlab.com/papamano/consent-guard/-/blob/main/Source/Detector/detectors/fingerprinting.js)) (vielleicht out of scope?)
+
+Weitere optionale Fragestellungen: (out of scope)
+- Besteht korrekte Verwendung von anonymize IP?
+- Ist die Seite während der Darstellung des consent Banners benutzbar?
+- Kann der Consent (einfach!) wiederrufen werden?
+
+Für die Klassifizierung der Requests und Cookies wird [adblockeval](https://github.com/hprid/adblockeval) mithilfe der Tracking Datenbanken EasyList und EasyPrivacy verwendet.
+Die tracking ID leaks werden anhand des Request logs ausgewertet (vgl. [leaks.js](https://gitlab.com/papamano/consent-guard/-/blob/main/Source/Detector/detectors/leaks.js)).
+Der log der Funktionsaufrufe wird mit bekannten tracking Funktionen verglichen.
+
+### Datenerhebung Aktivitätsdiagramm
 
 Die Datenerhebung wird in folgendem Aktivitätsdiagramm zusammengefasst:
 
 ![Activity Diagram](activity.png)
 
-### Weitere optionale Fragestellungen
-
-- Besteht korrekte Verwendung von anonymize IP?
-- Ist die Seite während der Darstellung des consent Banners benutzbar?
-- Kann der Consent (einfach!) wiederrufen werden?
 
 ### Vorläufige Studie
 
 Eine Teststudie wurde an 5 zufällig gewählten Seiten der Tranco Top 1k Liste durchgeführt:
+Zum Zeitpunkt der vorläufigen Studie ist die Analyse teilweise automatisiert, teilweise manuell (vgl. [Analyse Python Skript](https://github.com/martin-endress/interactive_privacyscanner/blob/main/manager/test_main.py)).
+
+Die Analyse enthält nicht die Fragestellung der Fingerprinting Funktionsaufrufe. Diese werden vom scanner noch nicht aufgezeichnet.
 
 Ausgewählte Seiten (keine DE domains):
+- https://mercadolibre.com.ar/
 - https://crunchyroll.com/
 - https://playstation.net/
-- https://mercadolibre.com.ar/
 - https://scribd.com/
 - https://stumbleupon.com/
+
+
+#### https://mercadolibre.com.ar/
+
+Alle 6 Cookies, welche vor Einwilligung geladen werden, stehen im Tracking Kontext. 2 davon scheinen 'echte' third party tracker zu sein: `nr-data.net` und `doubleclick.net`.
+
+Der First Party tracking Cookie (value="aa33158d-f6f3-4d57-a6d0-f33b4ff56fff") wird als post Request an `google-analytics.com` geleakt.
+
+Nach consent werden keine weiteren Tracker und Cookies geladen bzw. gesetzt.
+
+Es folgt der Output des Analyseskripts:
+
+```
+Analysis of https://mercadolibre.com.ar/:
+ Cookie Analysis:
+   TP tracking cookie domains before (n=6): {'.mercadopago.com.ar', '.mercadolibre.com', '.nr-data.net', '.mercadoshops.com.ar', '.doubleclick.net', '.mercadopago.com'}
+   TP tracking cookie domains after (n=6): {'.mercadopago.com.ar', '.mercadolibre.com', '.nr-data.net', '.mercadoshops.com.ar', '.doubleclick.net', '.mercadopago.com'}
+ TP request Analysis:
+   TP before:24 / 24 (trackers / total TPs)
+   TP after: 2 / 2
+   trackers before (n=24):
+{'39b1b09e47ad07d22f61f98b0ff3f5bb.safeframe.googlesyndication.com', 'melidata.mercadopago.com', 'adservice.google.com', 'melidata.mercadolibre.com', 'www.google.com', 'script.hotjar.com', 'melidata.mercadopago.com.ar', 'adservice.google.de', 'www.google-analytics.com', 'js-agent.newrelic.com', 'www.google.de', 'melidata.mercadoshops.com.ar', 'bam.nr-data.net', 'pagead2.googlesyndication.com', 'static.hotjar.com', 'http2.mlstatic.com', 'vc.hotjar.io', 'analytics.mercadolibre.com', 'api.mercadolibre.com', 'tpc.googlesyndication.com', 'securepubads.g.doubleclick.net', 'vars.hotjar.com', 'www.googletagservices.com', 'stats.g.doubleclick.net'}
+   trackers after (n=2):
+{'api.mercadolibre.com', 'bam.nr-data.net'}
+   additional trackers (n=0):
+set()
+```
 
 #### https://crunchyroll.com/
 
 Die Seite Crunchyroll verwendet ein Opt-Out Mechanismus und leitet nicht auf die deutsche Seite weiter. Die durchgeführte Interaktion ist kein consent, sondern Opt-Out. Neue third party domain im tracking Kontext: `csm.nl.eu.criteo.net`. Die Seite setzt 10 Cookies im tracking Kontext.
 
-Es folgt der Output des Analyseskripts:
 
 ```
 Analysis of https://crunchyroll.com/:
@@ -82,28 +122,6 @@ Analysis of https://crunchyroll.com/de/:
 #### https://playstation.net/
 
 Seite nicht verfügbar. (Could not resolve name)
-
-#### https://mercadolibre.com.ar/
-
-Alle 6 Cookies, welche vor Einwilligung geladen werden, stehen im Tracking Kontext. 2 davon scheinen 'echte' third party tracker zu sein: `nr-data.net` und `doubleclick.net`.
-
-Nach consent werden keine weiteren Tracker und Cookies geladen bzw. gesetzt.
-
-```
-Analysis of https://mercadolibre.com.ar/:
- Cookie Analysis:
-   TP tracking cookie domains before (n=6): {'.mercadopago.com.ar', '.mercadolibre.com', '.nr-data.net', '.mercadoshops.com.ar', '.doubleclick.net', '.mercadopago.com'}
-   TP tracking cookie domains after (n=6): {'.mercadopago.com.ar', '.mercadolibre.com', '.nr-data.net', '.mercadoshops.com.ar', '.doubleclick.net', '.mercadopago.com'}
- TP request Analysis:
-   TP before:24 / 24 (trackers / total TPs)
-   TP after: 2 / 2
-   trackers before (n=24):
-{'39b1b09e47ad07d22f61f98b0ff3f5bb.safeframe.googlesyndication.com', 'melidata.mercadopago.com', 'adservice.google.com', 'melidata.mercadolibre.com', 'www.google.com', 'script.hotjar.com', 'melidata.mercadopago.com.ar', 'adservice.google.de', 'www.google-analytics.com', 'js-agent.newrelic.com', 'www.google.de', 'melidata.mercadoshops.com.ar', 'bam.nr-data.net', 'pagead2.googlesyndication.com', 'static.hotjar.com', 'http2.mlstatic.com', 'vc.hotjar.io', 'analytics.mercadolibre.com', 'api.mercadolibre.com', 'tpc.googlesyndication.com', 'securepubads.g.doubleclick.net', 'vars.hotjar.com', 'www.googletagservices.com', 'stats.g.doubleclick.net'}
-   trackers after (n=2):
-{'api.mercadolibre.com', 'bam.nr-data.net'}
-   additional trackers (n=0):
-set()
-```
 
 #### https://scribd.com/
 
