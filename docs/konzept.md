@@ -1,4 +1,4 @@
-## Evaluation Konzept: Tracking auf .de domains
+## Evaluation Konzept: Third Party Tracking auf .de domains
 
 Analyse von `.de` domains auf Tracking Eigenschaften vor und nach Einwilligung des Consent Banners (sofern vorhanden).
 
@@ -6,13 +6,15 @@ Analyse von `.de` domains auf Tracking Eigenschaften vor und nach Einwilligung d
 Beispielsweise Top 100 `.de` domains der [tranco-list](https://tranco-list.eu/), oder random sample von top 1k.
 
 ### Vorgehen
-Beim Besuch der Seite werden third party requests aufgezeichnet und nach bekannten Tracker untersucht.
-Hierfür wird [adblockeval](https://github.com/hprid/adblockeval) mit den tracking datenbanken EasyList und EasyPrivacy verwendet.
+Beim Besuch der Seite werden gesetzte Cookies und third party requests aufgezeichnet und nach bekannten Tracker untersucht.
+Die gesetzten Cookies und third party requests werden jeweils vor und nach der Einwilligung des consent Banners, falls vorhanden, gespeichert.
+Das eventuelle Fehlen des Banners wird als Notiz vermerkt.
+Für die Klassifizierung der Requests und Cookies wird [adblockeval](https://github.com/hprid/adblockeval) mithilfe der Tracking Datenbanken EasyList und EasyPrivacy verwendet.
 
 ### Fragestellung
-Welche der third party requests vor (bzw. nach) user consent sind tracker?
-Welche kamen nach dem consent hinzu?
-Gibt es einen Cookie Banner?
+- Welche der third party requests vor (bzw. nach) user consent sind tracker?
+- Welche kamen nach dem consent erst hinzu?
+- Gibt es einen Cookie Banner?
 
 Die Datenerhebung wird in folgendem Aktivitätsdiagramm zusammengefasst:
 
@@ -20,15 +22,15 @@ Die Datenerhebung wird in folgendem Aktivitätsdiagramm zusammengefasst:
 
 ### Weitere optionale Fragestellungen
 
-- korrekte Verwendung von anonymize IP
+- Besteht korrekte Verwendung von anonymize IP?
 - Ist die Seite während der Darstellung des consent Banners benutzbar?
-- Kann consent (einfach!) Wiederrufen werden?
+- Kann der Consent (einfach!) wiederrufen werden?
 
 ### Vorläufige Studie
 
-Test Studie an 5 zufällig gewählten Seiten der Tranco Top 1k Liste:
+Eine Teststudie wurde an 5 zufällig gewählten Seiten der Tranco Top 1k Liste durchgeführt:
 
-Ausgewählte Seiten:
+Ausgewählte Seiten (keine DE domains):
 - https://crunchyroll.com/
 - https://playstation.net/
 - https://mercadolibre.com.ar/
