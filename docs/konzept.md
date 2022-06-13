@@ -7,19 +7,25 @@ Beispielsweise Top 100 `.de` domains der [tranco-list](https://tranco-list.eu/),
 
 ### Vorgehen
 Beim Besuch der Seite werden gesetzte Cookies und third party requests sowie JS Funktionsaufrufe aufgezeichnet.
-Unterschieden wird zwischen Cookies, requests und Funktionsaufrufen vor und nach der Einwilligung des Banners, sofern dieser vorhanden ist.
+Gespeichert werden Cookies, requests und Funktionsaufrufe jeweils vor und nach der Einwilligung des Banners, sofern dieser vorhanden ist.
 Das eventuelle Fehlen des Banners wird als Notiz vermerkt.
+
+### Datenerhebung Aktivitätsdiagramm
+
+Die Datenerhebung wird in folgendem Aktivitätsdiagramm zusammengefasst:
+
+![Activity Diagram](activity.png)
 
 ### Auswertung
 
 Die Auswertung ist in Teilen eine Replikation des [ConsentGuard](https://gitlab.com/papamano/consent-guard/) Paper von Papadogiannakis und anderen (2021).
 
-Die Auswertung soll folgende Fragen beantworten:
+Sie soll folgende Fragen beantworten:
 - Welche der third party requests sowie der gesetzten Cookies vor (bzw. nach) Nutzer Einwilligung sind tracker (tracking Kontext)?
   - Welche requests kamen erst nach der Einwilligung hinzu?
 - Gibt es einen Cookie Banner?
 - Gibt es vor Einwilligung tracking ID leaks? 
-- Gibt es vor Einwilligung bereits Funktionsaufrufe die im Tracking Kontext stehen? (siehe [fingerprinting.js](https://gitlab.com/papamano/consent-guard/-/blob/main/Source/Detector/detectors/fingerprinting.js)) (vielleicht out of scope?)
+- Gibt es vor Einwilligung bereits Funktionsaufrufe die im Tracking Kontext stehen? (vielleicht out of scope?)
 
 Weitere optionale Fragestellungen: (out of scope)
 - Besteht korrekte Verwendung von anonymize IP?
@@ -28,13 +34,7 @@ Weitere optionale Fragestellungen: (out of scope)
 
 Für die Klassifizierung der Requests und Cookies wird [adblockeval](https://github.com/hprid/adblockeval) mithilfe der Tracking Datenbanken EasyList und EasyPrivacy verwendet.
 Die tracking ID leaks werden anhand des Request logs ausgewertet (vgl. [leaks.js](https://gitlab.com/papamano/consent-guard/-/blob/main/Source/Detector/detectors/leaks.js)).
-Der log der Funktionsaufrufe wird mit bekannten tracking Funktionen verglichen.
-
-### Datenerhebung Aktivitätsdiagramm
-
-Die Datenerhebung wird in folgendem Aktivitätsdiagramm zusammengefasst:
-
-![Activity Diagram](activity.png)
+Der log der Funktionsaufrufe wird mit bekannten tracking Funktionen verglichen (vgl. [fingerprinting.js](https://gitlab.com/papamano/consent-guard/-/blob/main/Source/Detector/detectors/fingerprinting.js)).
 
 
 ### Vorläufige Studie
@@ -60,7 +60,7 @@ Der First Party tracking Cookie (value="aa33158d-f6f3-4d57-a6d0-f33b4ff56fff") w
 
 Nach consent werden keine weiteren Tracker und Cookies geladen bzw. gesetzt.
 
-Es folgt der Output des Analyseskripts:
+Es folgt die Ausgabe des [Analyse Skripts](https://github.com/martin-endress/interactive_privacyscanner/blob/main/manager/test_main.py):
 
 ```
 Analysis of https://mercadolibre.com.ar/:
