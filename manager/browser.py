@@ -9,7 +9,8 @@ from errors import ScannerError
 logger = logs.get_logger('chrome_api')
 
 SCREENSHOT_QUALITY = 80
-INIT_JS_PATH = "https://cdn.jsdelivr.net/gh/martin-endress/interactive_privacyscanner@record-interaction/manager/tmp/init.js"
+# alt link: https://cdn.jsdelivr.net/gh/martin-endress/interactive_privacyscanner@main/manager/init_interaction_record.js
+INIT_JS_PATH = "init_interaction_record.js"
 
 # 1 second
 MIN_SLEEP_TIME = 1
@@ -44,7 +45,7 @@ class Browser:
         self._page = await self._context.new_page()
 
         # Set init script for JS debug capabilities (see #22)
-        await self._page.add_init_script(path="tmp/init2.js")
+        await self._page.add_init_script(path=INIT_JS_PATH)
 
         # CDP session
         self._cdp_session = await self._context.new_cdp_session(self._page)
