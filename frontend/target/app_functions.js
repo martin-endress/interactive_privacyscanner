@@ -107,7 +107,7 @@ function init_ws() {
         }
     };
     socket.onerror = function (event) {
-        msg_json = { "SocketError": "Web socket.error, this should never happen :( ." };
+        msg_json = { "SocketError": "Web socket.error, this should never happen :( . Check if Backend is up." };
         app.ports.messageReceiver.send(msg_json);
     };
 }

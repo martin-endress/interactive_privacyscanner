@@ -13,8 +13,8 @@ DEVTOOLS_PORT = 9000
 
 PODMAN_SOCKET_URI = "unix://" + config.podman['podman_socket']
 
-# max lifetime in seconds (30 Minutes)
-CONTAINER_MAX_LIFETIME = 60 * 30
+# max lifetime in seconds (5 Minutes)
+CONTAINER_MAX_LIFETIME = 60 * 5
 
 logger = logs.get_logger('podman_api')
 

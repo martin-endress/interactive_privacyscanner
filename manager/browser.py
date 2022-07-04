@@ -17,6 +17,8 @@ MIN_SLEEP_TIME = 1
 DOCUMENT_LOADED_TIMEOUT = 10 * 1000
 # 5 seconds
 NETWORK_IDLE_TIMEOUT = 5 * 1000
+# 500 microseconds (2 kHz)
+PROFILER_SAMPLING_INTERVAL = 500
 
 
 class Browser:
@@ -112,6 +114,11 @@ class Browser:
                     raise ScannerError(f"Locator not found, scan aborted ({e}).") from e
             case default:
                 raise ScannerError(f"Unknown event '{default}', scan aborted.")
+
+    async def start_profiler(self):
+        await self.cpd_send_message("Profiler.enable")
+        await self.cpd_send_message("Profiler.setSamplingInterval", interval=PROFILER_SAMPLING_INTERVAL)
+        await self.cpd_send_message("Profiler.start")
 
 
 def debugger_paused(*args):

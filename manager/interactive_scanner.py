@@ -11,11 +11,11 @@ import podman_container
 import result
 from browser import Browser
 from errors import ScannerInitError, ScannerError
-from extractors import CookiesExtractor, RequestsExtractor, ResponsesExtractor
+from extractors import CookiesExtractor, RequestsExtractor, ResponsesExtractor, ProfileExtractor
 from result import Result, ResultKey
 from scanner_messages import ScannerMessage, MessageType
 
-EXTRACTOR_CLASSES = [CookiesExtractor, RequestsExtractor, ResponsesExtractor]
+EXTRACTOR_CLASSES = [CookiesExtractor, RequestsExtractor, ResponsesExtractor, ProfileExtractor]
 SCANNER_KEY = 'SCANNER_INTERACTION'
 
 logger = logs.get_logger('scanner')
@@ -143,6 +143,7 @@ class InteractiveScanner(Thread):
         """
         Create new target and navigate to page
         """
+        await self.browser.start_profiler()
         await self._register_callbacks()
         await self.browser.ignore_inputs(True)
         await self._navigate_to_page()
@@ -174,6 +175,10 @@ class InteractiveScanner(Thread):
             extractor_info = await extractor.extract_information()
             # append result
             intermediate_result = intermediate_result | extractor_info.copy()
+
+        if reason != ResultKey.END_SCAN:
+            # Start the profiler again, if it was not the last scan.
+            await self.browser.start_profiler()
         self._page = Page()
         self.result[ResultKey.INTERACTION].append(intermediate_result.copy())
 
@@ -272,8 +277,6 @@ class Page:
 
     def add_response(self, response):
         self.response_log.append(response)
-
-        # for r in self.request_log:  #    if r['id'] == requestId:  #        if not r['responses']:  #            r['responses'] = list()  #        r['responses'].append(response)
 
     def add_screenshot_path(self, path):
         self.screenshots.append(str(path))
