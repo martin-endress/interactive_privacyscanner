@@ -68,7 +68,7 @@ class Browser:
         # await self._cdp_session.send(setEventBreakpoint, params)
         self._cdp_session.on('Debugger.paused', debugger_paused)
 
-    async def cpd_send_message(self, msg, **params):
+    async def cdp_send_message(self, msg, **params):
         return await self._cdp_session.send(method=msg, params=params)
 
     def register_event(self, event_name, function):
@@ -92,7 +92,7 @@ class Browser:
         await self._page.screenshot(path=path, quality=SCREENSHOT_QUALITY, type='jpeg')
 
     async def ignore_inputs(self, ignore):
-        await self.cpd_send_message('Input.setIgnoreInputEvents', ignore=ignore)
+        await self.cdp_send_message('Input.setIgnoreInputEvents', ignore=ignore)
 
     async def wait_for_document_loaded(self):
         await asyncio.sleep(MIN_SLEEP_TIME)
@@ -117,9 +117,9 @@ class Browser:
                 raise ScannerError(f"Unknown event '{default}', scan aborted.")
 
     async def start_profiler(self):
-        await self.cpd_send_message("Profiler.enable")
-        await self.cpd_send_message("Profiler.setSamplingInterval", interval=PROFILER_SAMPLING_INTERVAL)
-        await self.cpd_send_message("Profiler.start")
+        await self.cdp_send_message("Profiler.enable")
+        await self.cdp_send_message("Profiler.setSamplingInterval", interval=PROFILER_SAMPLING_INTERVAL)
+        await self.cdp_send_message("Profiler.start")
 
 
 def debugger_paused(*args):

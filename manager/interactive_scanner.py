@@ -154,11 +154,11 @@ class InteractiveScanner(Thread):
     async def _navigate_to_page(self):
         self.logger.info("Navigating to Start URL.")
         await self.browser.navigate_url(self.url)
-        await self.browser.cpd_send_message("BackgroundService.startObserving", service="backgroundFetch")
+        await self.browser.cdp_send_message("BackgroundService.startObserving", service="backgroundFetch")
 
     async def _record_information(self, reason):
         await self.browser.wait_for_document_loaded()
-        target_info = await self.browser.cpd_send_message('Target.getTargetInfo')
+        target_info = await self.browser.cdp_send_message('Target.getTargetInfo')
         url = target_info["targetInfo"]["url"]
         url_parsed = urlparse(url)
         if not self.start_url_netloc == url_parsed.netloc:
@@ -246,12 +246,12 @@ class InteractiveScanner(Thread):
         """
         Register domain notifications and callbacks
         """
-        await self.browser.cpd_send_message('Network.enable')
-        await self.browser.cpd_send_message('Page.enable')
-        await self.browser.cpd_send_message('DOM.enable')
-        await self.browser.cpd_send_message('Security.enable')
-        await self.browser.cpd_send_message('Debugger.enable')
-        await self.browser.cpd_send_message('Runtime.enable')
+        await self.browser.cdp_send_message('Network.enable')
+        await self.browser.cdp_send_message('Page.enable')
+        await self.browser.cdp_send_message('DOM.enable')
+        await self.browser.cdp_send_message('Security.enable')
+        await self.browser.cdp_send_message('Debugger.enable')
+        await self.browser.cdp_send_message('Runtime.enable')
 
         # Enable callbacks
         self.browser.register_page_event("request", self._request_sent)
