@@ -216,6 +216,14 @@ class InteractiveScanner(Thread):
 
     # Callback Functions
 
+    async def _register_callbacks(self):
+        self.browser.register_callbacks()
+        # Enable callbacks
+        self.browser.register_page_event("request", self._request_sent)
+        self.browser.register_page_event("response", self._response_received)
+        # self.browser.register_page_event("framenavigated", self._frame_navigated)
+        self.browser.register_page_event("console", self._console_msg_received)
+
     async def _request_sent(self, request):
         self._page.add_request(request)
 
@@ -239,25 +247,6 @@ class InteractiveScanner(Thread):
         else:
             # logger.debug('console message: ' + msg_text)
             pass  # ignore other messages
-
-    # Callback Definition
-
-    async def _register_callbacks(self):
-        """
-        Register domain notifications and callbacks
-        """
-        await self.browser.cdp_send_message('Network.enable')
-        await self.browser.cdp_send_message('Page.enable')
-        await self.browser.cdp_send_message('DOM.enable')
-        await self.browser.cdp_send_message('Security.enable')
-        await self.browser.cdp_send_message('Debugger.enable')
-        await self.browser.cdp_send_message('Runtime.enable')
-
-        # Enable callbacks
-        self.browser.register_page_event("request", self._request_sent)
-        self.browser.register_page_event("response", self._response_received)
-        # self.browser.register_page_event("framenavigated", self._frame_navigated)
-        self.browser.register_page_event("console", self._console_msg_received)
 
 
 class Page:

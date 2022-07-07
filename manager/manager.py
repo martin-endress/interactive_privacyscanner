@@ -15,9 +15,10 @@ import result
 import scanner_messages
 from errors import ScannerError
 from interactive_scanner import InteractiveScanner
-from podman_container import run_container, podman_available, stop_container, kill_old_containers
+from podman_container import run_container, podman_available, kill_old_containers
 from result import ResultKey
 from scanner_messages import ScannerMessage, MessageType
+from utils import SessionManager
 
 # Init logging
 logs.configure('scan_manager.log')
@@ -40,6 +41,9 @@ scheduler.add_job(func=kill_old_containers, trigger="interval", seconds=60)
 scheduler.start()
 # Stop scheduler at exist
 atexit.register(lambda: scheduler.shutdown())
+
+# Session Manager
+sessionManager = SessionManager()
 
 
 @app.before_request
@@ -94,11 +98,17 @@ def start_scan():
     # Start initial scan
     scanner.put_msg(ScannerMessage(MessageType.StartScan))
 
+    # Append Session
+    session_id = sessionManager.create_session(container.id, container.vnc_port)
+
     # Respond
-    response_body = json.dumps(
-        {"vnc_port": container.vnc_port, "container_id": container.id})
+    response_body = json.dumps({"session": session_id})
     return Response(response_body, status=200)
 
+@app.route('/get_vnc_port', methods=['GET'])
+def get_vnc_port():
+    response_body = json.dumps({"vnc_port": 5900})
+    return Response(response_body, status=200)
 
 @app.route('/register_interaction', methods=['POST'])
 def register_interaction():
@@ -136,7 +146,7 @@ def clear_cookies():
     except PodmanError as e:
         return Response(f'Server Error: {e}', status=500)
     except ValueError as e:
-        return Response(f'Client Error: {e}' , status=400)
+        return Response(f'Client Error: {e}', status=400)
 
 
 @app.route('/take_screenshot', methods=['POST'])
@@ -166,22 +176,6 @@ def status():
     for s in scanners:
         s.send_socket_msg('asdf')
     return Response("server up", status=200)
-
-
-@app.route('/stop_all_scans', methods=['POST'])
-def stop_all_scans():
-    """
-    Used for debugging purposes.
-    """
-    for c_id, scanner in scanners.items():
-        try:
-            stop_container(c_id)
-            scanner.put_msg(ScannerMessage(MessageType.StopScan))
-        except PodmanError as e:
-            return Response(f'Server Error: {e}', status=500)
-        except ValueError as e:
-            return Response(f'Client Error: {e}', status=400)
-    return Response('Shutdown successful.', status=200)
 
 
 @app.route('/get_all_scans', methods=['GET'])
@@ -263,6 +257,7 @@ def scanner_message_sequence(interaction):
 def get_scanner():
     if request.json is None:
         raise ValueError("Request must be JSON containing the container id.")
+    # session_id
     container_id = request.json["container_id"]
     if container_id in scanners:
         return scanners[container_id]

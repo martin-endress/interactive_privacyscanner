@@ -13,9 +13,8 @@ startScan : (Result (Error String) ( Metadata, ContainerStartInfo ) -> msg) -> S
 startScan m scanUrl socketToken =
     let
         resultDecoder =
-            D.map2 ContainerStartInfo
-                (D.field "vnc_port" D.int)
-                (D.field "container_id" D.string)
+            D.map ContainerStartInfo
+                (D.field "session" D.string)
     in
     Http.post
         { url = managerApi "start_scan"
@@ -30,25 +29,25 @@ startScan m scanUrl socketToken =
 
 
 registerUserInteraction : (Result (Error Bytes) () -> msg) -> String -> Cmd msg
-registerUserInteraction m containerId =
+registerUserInteraction m session_id =
     Http.post
         { url = managerApi "register_interaction"
         , body =
             Http.jsonBody <|
                 E.object
-                    [ ( "container_id", E.string containerId ) ]
+                    [ ( "session_id", E.string session_id ) ]
         , expect = expectWhatever m
         }
 
 
 finishScan : (Result (Error Bytes) () -> msg) -> String -> String -> Cmd msg
-finishScan m note containerId =
+finishScan m note session_id =
     Http.post
         { url = managerApi "stop_scan"
         , body =
             Http.jsonBody <|
                 E.object
-                    [ ( "container_id", E.string containerId )
+                    [ ( "session_id", E.string session_id )
                     , ( "scan_note", E.string note )
                     ]
         , expect = expectWhatever m
@@ -56,24 +55,24 @@ finishScan m note containerId =
 
 
 clearBrowserCookies : (Result (Error Bytes) () -> msg) -> String -> Cmd msg
-clearBrowserCookies m containerId =
+clearBrowserCookies m session_id =
     Http.post
         { url = managerApi "clear_cookies"
         , body =
             Http.jsonBody <|
                 E.object
-                    [ ( "container_id", E.string containerId ) ]
+                    [ ( "session_id", E.string session_id ) ]
         , expect = expectWhatever m
         }
 
 
 takeScreenshot : (Result (Error Bytes) () -> msg) -> String -> Cmd msg
-takeScreenshot m containerId =
+takeScreenshot m session_id =
     Http.post
         { url = managerApi "take_screenshot"
         , body =
             Http.jsonBody <|
                 E.object
-                    [ ( "container_id", E.string containerId ) ]
+                    [ ( "session_id", E.string session_id ) ]
         , expect = expectWhatever m
         }

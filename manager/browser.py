@@ -75,6 +75,17 @@ class Browser:
         # see https://playwright.dev/python/docs/api/class-cdpsession
         self._cdp_session.on(event_name, function)
 
+    async def register_callbacks(self):
+        """
+        Register domain notifications and callbacks
+        """
+        await self.cdp_send_message('Network.enable')
+        await self.cdp_send_message('Page.enable')
+        await self.cdp_send_message('DOM.enable')
+        await self.cdp_send_message('Security.enable')
+        await self.cdp_send_message('Debugger.enable')
+        await self.cdp_send_message('Runtime.enable')
+
     def register_page_event(self, event_name, function):
         # see https://playwright.dev/python/docs/api/class-page
         self._page.on(event_name, function)

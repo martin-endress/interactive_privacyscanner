@@ -6,8 +6,7 @@ import String exposing (fromInt)
 
 
 type alias ContainerStartInfo =
-    { vnc_port : Int
-    , container_id : String
+    { session : String
     }
 
 

@@ -22,7 +22,7 @@ import Scan.View as View
 type alias Model =
     { scanState : ScanState
     , socketId : Maybe String
-    , connection : Maybe Connection
+    , session : Maybe String
     , interactionCount : Int
     , urlInput : String
     , noteInput : String
@@ -32,18 +32,12 @@ type alias Model =
     }
 
 
-type alias Connection =
-    { vncPort : Int
-    , containerId : String
-    }
-
-
 type Msg
     = UpdateUrlInput String
     | SetGuacamoleFocus Bool
     | StartScan
     | GotStartScan (Result (Error String) ( Metadata, ContainerStartInfo ))
-    | ConnectToGuacamole Connection
+    | ConnectToGuacamole String
     | ReceiveScanUpdate ScanUpdate
     | UpdateNoteInput String
     | RegisterInteraction
@@ -62,7 +56,7 @@ init : Model
 init =
     { scanState = Idle
     , socketId = Nothing
-    , connection = Nothing
+    , session = Nothing
     , interactionCount = 0
     , currentUrl = ""
     , urlInput = ""
@@ -77,7 +71,7 @@ clearModel oldModel =
     -- clear model for everything except socket id (allow for repeated scans)
     { scanState = Idle
     , socketId = oldModel.socketId
-    , connection = Nothing
+    , session = Nothing
     , interactionCount = 0
     , currentUrl = ""
     , urlInput = ""
@@ -112,27 +106,25 @@ update msg model =
         GotStartScan result ->
             processStartResult model result
 
-        ConnectToGuacamole connection ->
+        ConnectToGuacamole session ->
             ( appendLogEntry { msg = "Connecting to Guacamole...", level = Data.Info } model
             , Ports.connectTunnel <|
                 E.object
-                    [ ( "vncPort", E.int connection.vncPort )
-                    , ( "containerId", E.string connection.containerId )
+                    [ ( "session", E.string session )
                     ]
             )
 
         ReceiveScanUpdate scanUpdate ->
             processScanUpdate scanUpdate model
 
-        UpdateNoteInput newNoteInput ->
+        UpdateNoteInput newNoteInput -> 
             ( { model | noteInput = newNoteInput }
             , Cmd.none
             )
 
         RegisterInteraction ->
             ( model
-            , model.connection
-                |> Maybe.map .containerId
+            , model.session
                 |> Maybe.map
                     (Requests.registerUserInteraction (GotRequestResult (Just ScanInProgress)))
                 |> Maybe.withDefault Cmd.none
@@ -150,8 +142,7 @@ update msg model =
 
         TakeScreenshot ->
             ( model
-            , model.connection
-                |> Maybe.map .containerId
+            , model.session
                 |> Maybe.map
                     (Requests.takeScreenshot (GotRequestResult Nothing))
                 |> Maybe.withDefault Cmd.none
@@ -159,8 +150,7 @@ update msg model =
 
         ClearBrowserCookies ->
             ( model
-            , model.connection
-                |> Maybe.map .containerId
+            , model.session
                 |> Maybe.map
                     (Requests.clearBrowserCookies (GotRequestResult (Just ScanInProgress)))
                 |> Maybe.withDefault Cmd.none
@@ -191,8 +181,7 @@ finishScanCommands : Model -> Cmd Msg
 finishScanCommands model =
     let
         finishCmd =
-            model.connection
-                |> Maybe.map .containerId
+            model.session
                 |> Maybe.map
                     (Requests.finishScan
                         (GotRequestResult (Just FinalScanInProgress))
@@ -207,17 +196,11 @@ processStartResult : Model -> Result (Error String) ( Metadata, ContainerStartIn
 processStartResult model result =
     case result of
         Ok ( _, containerInfo ) ->
-            let
-                connection =
-                    { vncPort = containerInfo.vnc_port
-                    , containerId = containerInfo.container_id
-                    }
-            in
             ( updateScanState ScanInProgress
                 { model
-                    | connection = Just connection
+                    | session = Just containerInfo.session
                 }
-            , Delay.after 500 (ConnectToGuacamole connection)
+            , Delay.after 500 (ConnectToGuacamole containerInfo.session)
             )
 
         Err error ->
@@ -259,8 +242,8 @@ processScanUpdate scanUpdate model =
                 cmd =
                     case scanUpdate of
                         GuacamoleMsg _ ->
-                            model.connection
-                                |> Maybe.map (\c -> Delay.after 500 (ConnectToGuacamole c))
+                            model.session
+                                |> Maybe.map (\s_id -> Delay.after 500 (ConnectToGuacamole s_id))
                                 |> Maybe.withDefault Cmd.none
 
                         _ ->

@@ -77,12 +77,12 @@ app.ports.setGuacamoleFocus.subscribe(function (focus) {
 })
 
 // connect to guacamole
-app.ports.connectTunnel.subscribe(function (connection) {
-    connectGuacamole(connection);
+app.ports.connectTunnel.subscribe(function (session) {
+    connectGuacamole(session);
 });
 
-function connectGuacamole(connection) {
-    param = "port=" + connection.vncPort.toString()
+function connectGuacamole(session) {
+    param = "session=" + session.session_id.toString()
     client.connect(param);
 }
 
