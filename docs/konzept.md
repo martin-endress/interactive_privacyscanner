@@ -26,7 +26,7 @@ Notizen:
 oder Freitext
 
 Hinweise:
-- Falls kritische Fehler auftreten: Seite neu Laden und Scan einmal erneut probieren. Falls es dann immernoch nicht klappt, Seite als fehlerhaft vermerken und weiter mit nächster Seite.
+- Falls kritische Fehler auftreten (zB Websocket closed): Seite neu Laden und Scan einmal erneut probieren. Falls es dann immernoch nicht klappt, Seite als fehlerhaft vermerken und weiter mit nächster Seite.
 - Das Tool hat noch ein Paar bugs, z.B. dauert das Verbinden mit dem Websocket manchmal etwas (bis zu 10s). Es liegt an Caching, nicht an eurem Browser.
 - Der Fehler `Guacamole msg:guac error (status=519) - Aborted. See logs.` kann ignoriert werden. Es wird automatisch neu verbunden. Falls länger nicht klappt, siehe oben.
 
