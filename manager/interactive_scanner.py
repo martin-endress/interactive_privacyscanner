@@ -11,11 +11,11 @@ import podman_container
 import result
 from browser import Browser
 from errors import ScannerInitError, ScannerError
-from extractors import CookiesExtractor, RequestsExtractor, ResponsesExtractor, ProfileExtractor
+from extractors import CookiesExtractor, RequestsExtractor, ResponsesExtractor, ProfileExtractor, TPCookiesExtractor
 from result import Result, ResultKey
 from scanner_messages import ScannerMessage, MessageType
 
-EXTRACTOR_CLASSES = [CookiesExtractor, RequestsExtractor, ResponsesExtractor, ProfileExtractor]
+EXTRACTOR_CLASSES = [CookiesExtractor, RequestsExtractor, ResponsesExtractor, ProfileExtractor, TPCookiesExtractor]
 SCANNER_KEY = 'SCANNER_INTERACTION'
 
 logger = logs.get_logger('scanner')
@@ -46,7 +46,7 @@ class InteractiveScanner(Thread):
         self.container_id = container_id
         self.options = options
         self._extractors = []
-        self._page = Page()
+        self._page = Page(self.url)
 
     def _init_result(self):
         site_parsed = urlparse(self.url)
@@ -179,7 +179,7 @@ class InteractiveScanner(Thread):
         if reason != ResultKey.END_SCAN:
             # Start the profiler again, if it was not the last scan.
             await self.browser.start_profiler()
-        self._page = Page()
+        self._page = Page(self.url)
         self.result[ResultKey.INTERACTION].append(intermediate_result.copy())
 
     async def _perform_user_interaction(self, user_interaction):
@@ -213,6 +213,7 @@ class InteractiveScanner(Thread):
         await self.browser.ignore_inputs(True)
         await self._record_information(ResultKey.END_SCAN)
         self.result.store_result(note=note)
+        self.result = None
 
     # Callback Functions
 
@@ -261,7 +262,8 @@ class InteractiveScanner(Thread):
 
 
 class Page:
-    def __init__(self):
+    def __init__(self, url):
+        self.url = url
         self.scan_time = int(time.time())
         self.request_log = []
         self.failed_request_log = []
