@@ -26,10 +26,8 @@ color_pallete = [ubblue80, ubyellow, ubblue40, ubred, ubgreen, ubblue, ubblue60,
 df = pd.read_csv("results.csv", delimiter=',', na_values='-1')
 
 # transform data
-print(len(df))
 df['note'] = np.where(df['note'].isnull(), '', df.note)
 df.dropna(inplace=True)
-print(len(df))
 
 # create banner column
 conditions = [df['note'] == 'm', df['note'] == '', df['note'] == 'x']
@@ -38,6 +36,9 @@ df['banner'] = np.select(conditions, values)
 
 # figure banner
 fig, ax = plt.subplots(figsize=(3, 2.5))
-df['banner'].value_counts().plot(ax=ax, kind='bar', color=color_pallete, rot=0, width=0.5)
+df['banner'] \
+    .value_counts() \
+    .sort_index(ascending=False) \
+    .plot(ax=ax, kind='bar', color=[ubyellow25, ubred, ubblue40], rot=0, width=0.5)
 plt.savefig(out_path / 'banner_types.pdf')
 
