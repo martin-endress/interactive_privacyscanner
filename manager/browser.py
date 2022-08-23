@@ -96,6 +96,9 @@ class Browser:
     async def get_cookies(self):
         return await self._context.cookies()
 
+    async def get_cookies1(self, url):
+        return await self._context.cookies([url])
+
     async def clear_cookies(self):
         await self._context.clear_cookies()
 

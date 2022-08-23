@@ -228,7 +228,7 @@ def filter_dict(d, keys):
 
 
 def get_result_id(netloc):
-    now = datetime.now().strftime("%y-%m-%d_%H-%M")
+    now = datetime.now().strftime("%y-%m-%d_%H-%M-%S")
     return f"{utils.slugify(netloc)}_{now}"
 
 
