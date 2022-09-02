@@ -32,7 +32,7 @@ ubgreen = "#97BF0D"
 color_pallete = [ubblue80, ubyellow, ubblue40, ubred, ubgreen, ubblue, ubblue60, ubblue20, ubyellow25]
 
 # read data from CSV
-df = pd.read_csv("results.csv", delimiter=',', na_values='-1')
+df = pd.read_csv("results1.csv", delimiter=',', na_values='-1')
 n = len(df)
 
 # transform data
@@ -44,10 +44,10 @@ conditions = [df['note'] == 'm', df['note'] == '', df['note'] == 'x']
 values = ['modal', 'banner', 'no banner']
 df['banner'] = np.select(conditions, values)
 
-num_columns = ['additional_trackers', 'tp_cookies_after', 'tp_cookies_before', 'tp_requests_after',
-               'tp_requests_before', 'tracking_tp_after', 'tracking_tp_before', 'tp_id_leaks_before',
-               'tp_cookie_sync_before', 'fingerprinting_before', 'tp_id_leaks_after', 'tp_cookie_sync_after',
-               'fingerprinting_after']
+num_columns = ['tp_cookies_before', 'tp_cookies_after', 'tp_requests_before', 'tp_requests_after', 'tp_requests_total',
+               'tracking_tp_before', 'tracking_tp_after', 'tracking_tp_total', 'tracking_tp_additional',
+               'tp_id_leaks_before', 'tp_cookie_sync_before', 'fingerprinting_before', 'tp_id_leaks_after',
+               'tp_cookie_sync_after', 'fingerprinting_after']
 
 pivot = df.apply(lambda x: map_cmp(x) if x.name in num_columns else x) \
     .apply(np.sum)
@@ -57,9 +57,9 @@ leak = [pivot['tp_id_leaks_before'] - pivot['tp_cookie_sync_before'],
         pivot['tp_id_leaks_after'] - pivot['tp_cookie_sync_after']]
 cookie_sync = [pivot['tp_cookie_sync_before'], pivot['tp_cookie_sync_after']]
 
+piv_tracking = [pivot['tracking_tp_before'], pivot['tracking_tp_after'] - pivot['tracking_tp_additional']]
+piv_additional = [pivot['tracking_tp_additional'] - pivot['tracking_tp_additional'], pivot['tracking_tp_additional']]
 piv_no_tracking = [n - pivot['tracking_tp_before'], n - pivot['tracking_tp_after']]
-piv_tracking = [pivot['tracking_tp_before'], pivot['tracking_tp_after'] - pivot['additional_trackers']]
-piv_additional = [pivot['additional_trackers'] - pivot['additional_trackers'], pivot['additional_trackers']]
 
 leak_before = [n - pivot['tp_id_leaks_before'],
                pivot['tp_id_leaks_before'] - pivot['tp_cookie_sync_before'],
@@ -108,7 +108,7 @@ def plot_tp():
         .rename(columns=
                 {"tp_requests_before": "before consent",
                  "tp_requests_after": "after consent",
-                 "additional_trackers": "total"}) \
+                 "tp_requests_total": "total"}) \
         .plot(kind='box',
               column=['before consent', 'after consent', 'total'],
               medianprops=dict(linestyle='-', linewidth=1.5, color='black'),
@@ -147,14 +147,11 @@ def plot_tracking():
     ax.set_ylabel('Websites')
     ax.set_position([0.175, 0.13, 0.8, 0.8])
     ax.legend()
-#    plt.show()
+
     plt.savefig(out_path / 'tracking_tp.pdf')
 
 
-#plot_tp()
-#plot_leak()
-#plot_banner()
-#plot_tracking()
-
-print(piv_tracking)
-print(piv_additional)
+plot_tp()
+plot_leak()
+plot_banner()
+plot_tracking()

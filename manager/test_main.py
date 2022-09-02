@@ -1,6 +1,7 @@
 import asyncio
 import csv
 import json
+from collections import defaultdict
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -13,22 +14,26 @@ import utils
 rule_files = ['resources/easylist.txt', 'resources/easyprivacy.txt', 'resources/fanboy-annoyance.txt']
 rule_checker = rules.AdblockRules(rule_files=rule_files, skip_parsing_errors=True)
 
+STUDY_PATH = Path("/home/martin/git/interactive_privacyscanner/study/")
+
 
 def generate_csv():
-    with open(Path("/home/martin/git/interactive_privacyscanner/study/results.csv"), 'w', newline='') as csvfile:
+    with open(STUDY_PATH / "results1.csv", 'w', newline='') as csvfile:
         csv_writer = csv.writer(csvfile, delimiter=',')
         header = ['url',
                   'note',
                   'modal_present',
                   'banner_present',
                   # tp analysis
-                  'additional_trackers',
-                  'tp_cookies_after',
                   'tp_cookies_before',
-                  'tp_requests_after',
+                  'tp_cookies_after',
                   'tp_requests_before',
-                  'tracking_tp_after',
+                  'tp_requests_after',
+                  'tp_requests_total',
                   'tracking_tp_before',
+                  'tracking_tp_after',
+                  'tracking_tp_total',
+                  'tracking_tp_additional',
                   # leak analysis before
                   'tp_id_leaks_before',
                   'tp_cookie_sync_before',
@@ -41,7 +46,7 @@ def generate_csv():
 
         csv_writer.writerow(header)
 
-        results_path = Path("/home/martin/git/interactive_privacyscanner/study/data")
+        results_path = STUDY_PATH / "data2"
         i = 0
         for result_folder in results_path.iterdir():
             print(f'{i}) {result_folder.name}:')
@@ -60,7 +65,7 @@ def get_analysis(result_path):
 
         user_note = ''
         if 'user_note' in result_d:
-            user_note = result_d['user_note']
+            user_note = result_d['user_note'].lower()
         row.append(user_note)  # note
         row.append(int(user_note.lower() == 'm'))  # modal_present
         row.append(int(user_note.lower() != 'x'))  # banner_present
@@ -71,15 +76,17 @@ def get_analysis(result_path):
     analysis_file = result_path / "first_scan" / "analysis.json"
     analysis = utils.load_json(analysis_file)
     if analysis:
-        row.append(analysis['additional_trackers'])  # additional_trackers
-        row.append(analysis['tp_cookies_after'])  # tp_cookies_after
-        row.append(analysis['tp_cookies_before'])  # tp_cookies_before
-        row.append(analysis['tp_requests_after'])  # tp_requests_after
-        row.append(analysis['tp_requests_before'])  # tp_requests_before
-        row.append(analysis['tracking_tp_after'])  # tracking_tp_after
-        row.append(analysis['tracking_tp_before'])  # tracking_tp_before
+        row.append(analysis['tp_cookies_before'])
+        row.append(analysis['tp_cookies_after'])
+        row.append(analysis['tp_requests_before'])
+        row.append(analysis['tp_requests_after'])
+        row.append(analysis['tp_requests_total'])
+        row.append(analysis['tracking_tp_before'])
+        row.append(analysis['tracking_tp_after'])
+        row.append(analysis['tracking_tp_total'])
+        row.append(analysis['tracking_tp_additional'])
     else:
-        row += [-1] * 7
+        row += [-1] * 9
 
     # cookie sync analysis before
     analysis_file = result_path / "first_scan" / "analysis_before" / "results.json"
@@ -106,13 +113,23 @@ def get_analysis(result_path):
         row.append(fingerprinting_after)  # fingerprinting_after
     else:
         row += [-1] * 3
-
+    if -1 in row:
+        # if one entry has error, set every entry to error
+        row = row[:2] + [-1] * (len(row) - 2)
     return row
 
 
 def analyze():
-    path = Path("/home/martin/git/interactive_privacyscanner/study/data")
+    path = STUDY_PATH / "data2"
     i = 0
+
+    tp_count_before = defaultdict(int)
+    tp_count_additional = defaultdict(int)
+    tp_count_total = defaultdict(int)
+    tp_tracker_count_before = defaultdict(int)
+    tp_tracker_count_additional = defaultdict(int)
+    tp_tracker_count_total = defaultdict(int)
+
     for result_folder in path.iterdir():
         if not result_folder.is_dir():
             print(f'{result_folder.name} skipped.')
@@ -132,8 +149,36 @@ def analyze():
                 print(f'{result_folder.name} skipped. (unexpected number of interactions: {len(interaction)})')
                 continue
             analysis_filename = (result_folder / result.FIRST_SCAN)
-            analyze_interaction(scan_domain, interaction[0], interaction[1], analysis_filename)
+            results = analyze_interaction(scan_domain, interaction[0], interaction[1], analysis_filename)
+
+            append_count(results['tp_requests_before'], tp_count_before)
+            append_count(results['tp_requests_additional'], tp_count_additional)
+            append_count(results['tp_requests_total'], tp_count_total)
+            append_count(results['tracking_tp_before'], tp_tracker_count_before)
+            append_count(results['tracking_tp_additional'], tp_tracker_count_additional)
+            append_count(results['tracking_tp_total'], tp_tracker_count_total)
         i += 1
+
+    header = ['domain', 'count']
+    write_simple_csv("tp_count_before.csv", header, tp_count_before.items())
+    write_simple_csv("tp_count_additional.csv", header, tp_count_additional.items())
+    write_simple_csv("tp_count_total.csv", header, tp_count_total.items())
+    write_simple_csv("tp_tracker_count_before.csv", header, tp_tracker_count_before.items())
+    write_simple_csv("tp_tracker_count_additional.csv", header, tp_tracker_count_additional.items())
+    write_simple_csv("tp_tracker_count_total.csv", header, tp_tracker_count_total.items())
+
+
+def append_count(new_occ, count):
+    for c in new_occ:
+        count[c] += 1
+
+
+def write_simple_csv(filename, header, items):
+    path = STUDY_PATH / filename
+    with open(path, 'w', newline='') as csvfile:
+        csv_writer = csv.writer(csvfile, delimiter=',')
+        csv_writer.writerow(header)
+        csv_writer.writerows(items)
 
 
 def contains_tracker(urls):
@@ -141,14 +186,21 @@ def contains_tracker(urls):
 
 
 def analyze_interaction(scan_domain, interaction_before, interaction_after, path):
+    # before
     tp_cookies_before = get_third_parties_c(scan_domain, interaction_before['cookies'])
     tp_requests_before = get_third_parties_r(scan_domain, interaction_before['requests'])
     tracking_tp_before = {k for k, v in tp_requests_before.items() if contains_tracker(v)}
+
+    # after
     tp_cookies_after = get_third_parties_c(scan_domain, interaction_after['cookies'])
     tp_requests_after = get_third_parties_r(scan_domain, interaction_after['requests'])
     tracking_tp_after = {k for k, v in tp_requests_after.items() if contains_tracker(v)}
 
-    new_tp = tracking_tp_after - tracking_tp_before
+    tp_requests_combined = set(tp_requests_before.keys()).union(set(tp_requests_after.keys()))
+    tp_requests_additional = set(tp_requests_after.keys()).difference(set(tp_requests_before.keys()))
+
+    tracking_tp_combined = tracking_tp_after.union(tracking_tp_before)
+    tracking_tp_additional = tracking_tp_after.difference(tracking_tp_before)
 
     tp_analysis = {
         "tp_cookies_before": len(tp_cookies_before),
@@ -157,16 +209,22 @@ def analyze_interaction(scan_domain, interaction_before, interaction_after, path
         "tp_cookies_after": len(tp_cookies_after),
         "tp_requests_after": len(tp_requests_after),
         "tracking_tp_after": len(tracking_tp_after),
-        "additional_trackers": len(new_tp),
+        "tp_requests_additional": len(tp_requests_additional),
+        "tp_requests_total": len(tp_requests_combined),
+        "tracking_tp_total": len(tracking_tp_combined),
+        "tracking_tp_additional": len(tracking_tp_additional),
     }
     tp_analysis_detailed = {
         "tp_cookies_before": list(tp_cookies_before),
-        "tp_cookies_after": list(tp_cookies_after),
-        "tp_requests_before": list(tp_requests_before),
+        "tp_requests_before": list(tp_requests_before.keys()),
         "tracking_tp_before": list(tracking_tp_before),
-        "tp_requests_after": list(tp_requests_after),
+        "tp_cookies_after": list(tp_cookies_after),
+        "tp_requests_after": list(tp_requests_after.keys()),
         "tracking_tp_after": list(tracking_tp_after),
-        "additional_trackers": list(new_tp),
+        "tp_requests_additional": list(tp_requests_additional),
+        "tp_requests_total": list(tp_requests_combined),
+        "tracking_tp_total": list(tracking_tp_combined),
+        "tracking_tp_additional": list(tracking_tp_additional),
     }
 
     analysis_path = path / "analysis.json"
@@ -174,6 +232,8 @@ def analyze_interaction(scan_domain, interaction_before, interaction_after, path
 
     analysis_path_detailed = path / "analysis_detailed.json"
     utils.store_json(analysis_path_detailed, tp_analysis_detailed)
+
+    return tp_analysis_detailed
 
 
 def get_third_parties_c(first_party, cookies):
@@ -241,4 +301,4 @@ async def test_selectors():
 
 
 if __name__ == "__main__":
-    generate_csv()
+    analyze()

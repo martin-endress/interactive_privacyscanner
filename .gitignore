@@ -8,6 +8,7 @@ bin/
 /manager/manager.cfg
 /guacamole_backend/target/
 /study/data
+/study/data2
 
 ### Elm ###
 frontend/target/elm.js
