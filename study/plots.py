@@ -4,6 +4,7 @@ from pathlib import Path
 import matplotlib
 import numpy as np
 import pandas as pd
+import scipy
 from matplotlib import pyplot as plt
 
 out_path = Path("../../psi-exposee-master/degree-thesis/en/figures/study/")
@@ -61,6 +62,10 @@ piv_tracking = [pivot['tracking_tp_before'], pivot['tracking_tp_after'] - pivot[
 piv_additional = [pivot['tracking_tp_additional'] - pivot['tracking_tp_additional'], pivot['tracking_tp_additional']]
 piv_no_tracking = [n - pivot['tracking_tp_before'], n - pivot['tracking_tp_after']]
 
+piv_cookies = [pivot['tp_cookies_before'], pivot['tp_cookies_after']]
+piv_no_cookies = [n - pivot['tp_cookies_before'], n - pivot['tp_cookies_after']]
+
+
 leak_before = [n - pivot['tp_id_leaks_before'],
                pivot['tp_id_leaks_before'] - pivot['tp_cookie_sync_before'],
                pivot['tp_cookie_sync_before']]
@@ -102,15 +107,17 @@ def plot_leak():
 def plot_tp():
     fig, ax = plt.subplots(figsize=(5.2, 4))
 
-    colors = [ubblue40, ubyellow25, ubgreen]
+    colors = [ubblue40, ubgreen, ubred, ubyellow25]
 
     ax, props = df \
         .rename(columns=
-                {"tp_requests_before": "before consent",
-                 "tp_requests_after": "after consent",
-                 "tp_requests_total": "total"}) \
+                {"tp_requests_before": "TPs before",
+                 # "tp_requests_after": "after consent",
+                 "tp_requests_total": "TPs total",
+                 "tracking_tp_before": "trackers before",
+                 "tracking_tp_total": "trackers total"}) \
         .plot(kind='box',
-              column=['before consent', 'after consent', 'total'],
+              column=['TPs before', 'TPs total', 'trackers before', 'trackers total'],
               medianprops=dict(linestyle='-', linewidth=1.5, color='black'),
               color=dict(boxes='black', whiskers='black', medians='black', caps='black'),
               patch_artist=True,
@@ -151,7 +158,30 @@ def plot_tracking():
     plt.savefig(out_path / 'tracking_tp.pdf')
 
 
-plot_tp()
-plot_leak()
-plot_banner()
-plot_tracking()
+def plot_cookies():
+    fig, ax = plt.subplots(figsize=(3.6, 3))
+
+    labels = ['before consent', 'after consent']
+    width = 0.25  # the width of the bars: can also be len(x) sequence
+
+    ax.bar(labels, piv_cookies, width,
+           bottom=piv_no_cookies,
+           label='tracking', color=ubred)
+    ax.bar(labels, piv_no_cookies, width,
+           label='no tracking', color=ubblue40)
+    ax.set_ylabel('Websites')
+    ax.set_position([0.175, 0.13, 0.8, 0.8])
+    ax.legend()
+
+    plt.savefig(out_path / 'tracking_cookies.pdf')
+
+
+# plot_tp()
+# plot_leak()
+# plot_banner()
+# plot_tracking()
+# plot_cookies()
+
+print(df['tracking_tp_before'].mean())
+print(df['tp_cookies_after'].mean())
+
