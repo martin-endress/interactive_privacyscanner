@@ -33,7 +33,7 @@ ubgreen = "#97BF0D"
 color_pallete = [ubblue80, ubyellow, ubblue40, ubred, ubgreen, ubblue, ubblue60, ubblue20, ubyellow25]
 
 # read data from CSV
-df = pd.read_csv("results1.csv", delimiter=',', na_values='-1')
+df = pd.read_csv("results.csv", delimiter=',', na_values='-1')
 n = len(df)
 
 # transform data
@@ -176,12 +176,12 @@ def plot_cookies():
     plt.savefig(out_path / 'tracking_cookies.pdf')
 
 
-# plot_tp()
-# plot_leak()
-# plot_banner()
-# plot_tracking()
-# plot_cookies()
+#plot_tp()
+#plot_leak()
+#plot_banner()
+#plot_tracking()
+#plot_cookies()
 
-print(df['tracking_tp_before'].mean())
-print(df['tp_cookies_after'].mean())
+print(df['duration'].median())
+print(df['duration'].mean())
 
