@@ -7,7 +7,7 @@ It is conceptualized as a research tool to study possibly unobserved tracking te
 Thesis Supervisor: [Prof. Dr. Dominik Herrmann](https://www.uni-bamberg.de/psi/team/dominik-herrmann/)  
 Thesis Advisor: [Henning Pridöhl](https://www.uni-bamberg.de/psi/team/henning-pridoehl/)
 
-
+Read full [thesis](https://github.com/martin-endress/interactive_privacyscanner/blob/main/docs/thesis.pdf).
 
 ## Build Requirements
 
